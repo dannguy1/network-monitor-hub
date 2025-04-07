@@ -132,6 +132,10 @@ These instructions guide setting up a local development environment.
         # $env:FLASK_APP="backend.app:create_app"; $env:FLASK_CONFIG="development"
         ```
         *(These tell Flask how to load your app. Run these commands in the same terminal session where you run the `flask db` commands below.)*
+    *   Ensure the default data directory exists (for SQLite):
+        ```bash
+        mkdir -p backend/data
+        ```
     *   Initialize the database migration repository (only run once per project):
         ```bash
         flask db init

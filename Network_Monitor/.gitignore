@@ -1,23 +1,39 @@
-.gitignore content:
-venv/
+# .gitignore content:
+
+# Python Virtual Environment
+backend/venv/
+
+# Python bytecode/compiled files
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Environment files
 .env
 .flaskenv
 instance/
-*.sqlite3
-data/
-!data/.gitkeep
 
-# Frontend
-Network_Monitor/frontend/node_modules/
-Network_Monitor/frontend/build/
-Network_Monitor/frontend/.pnp
-Network_Monitor/frontend/.pnp.js
-Network_Monitor/frontend/coverage/
-Network_Monitor/frontend/.DS_Store
-Network_Monitor/frontend/npm-debug.log*
-Network_Monitor/frontend/yarn-debug.log*
-Network_Monitor/frontend/yarn-error.log* 
+# Database files (ignore specific files, not the directory)
+*.sqlite
+*.sqlite3
+backend/data/app.db
+
+# Keep the data directory structure if needed (optional)
+# !backend/data/.gitkeep
+
+# Frontend Build/Dependencies
+frontend/node_modules/
+frontend/build/
+frontend/.pnp
+frontend/.pnp.js
+frontend/coverage/
+
+# OS-specific / Editor files
+.DS_Store
+
+# Log files (if any are generated locally)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log 
