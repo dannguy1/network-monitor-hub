@@ -2,7 +2,9 @@ from flask import Blueprint, jsonify
 from flask_login import login_required
 from datetime import datetime, timedelta
 
-from ..models import db, Device, LogEntry # Import necessary models
+# Corrected imports:
+from .. import db                 # db is defined in app/__init__.py (one level up)
+from ..models import Device, LogEntry # Models are defined in app/models/ (one level up, then down)
 
 # Create Blueprint
 bp = Blueprint('dashboard', __name__)

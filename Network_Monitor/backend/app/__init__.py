@@ -83,7 +83,7 @@ def create_app(config_name=None):
     cli.register(app)
 
     # Schedule tasks if needed (make sure this runs only once)
-    if app.config['ENV'] != 'testing': # Don't run scheduler in tests easily
+    if not app.config.get('TESTING'): # Don't run scheduler in tests easily
         # Check if the job is already scheduled to avoid duplicates on reload
         if not scheduler.get_job('push_ai_logs'):
             from .services.ai_pusher import push_logs_to_ai
