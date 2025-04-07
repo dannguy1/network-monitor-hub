@@ -4,202 +4,251 @@ A full-stack application designed to run efficiently on a Raspberry Pi 5, acting
 
 ## Features
 
-*   **Syslog Service:** Collects logs from multiple OpenWRT devices via UDP (default port 514).
-*   **Web Interface:** A React-based UI for:
-    *   Viewing collected logs with filtering (by device, level, timestamp, message content) and pagination.
-    *   Managing monitored devices (Add, Edit, Delete).
-    *   Managing SSH credentials (Add, Edit, Delete, Password/Private Key support).
-    *   Associating/Disassociating credentials with devices.
-    *   Verifying SSH connectivity using stored credentials.
-    *   Applying basic UCI configurations (Hostname, LAN IP/Netmask/Gateway) via SSH.
+*   **Syslog Service:** Collects logs from multiple OpenWRT devices via UDP (default port 514, see `.env.example`).
+*   **Web Interface:** A React-based UI featuring:
+    *   Dashboard overview.
+    *   Device management (Add, Edit, Delete, Credential Association).
+    *   Credential management (Add, Edit, Delete - Password/Private Key support).
+    *   SSH connection verification.
+    *   Remote logging configuration toggle per device.
+    *   Log viewing with filtering (by device, level, timestamp, message content) and pagination.
+    *   Basic UCI configuration deployment via SSH (Hostname, LAN IP/Netmask/Gateway).
+    *   Device reboot command.
 *   **UCI Configuration:** Generates and applies UCI commands based on user input through the Web UI.
-*   **SSH Deployment:** Applies configurations securely using Paramiko, supporting password and private key authentication.
-*   **Secure Credential Management:** Encrypts stored SSH passwords and private keys using Fernet (cryptography library).
-*   **Log Reformatting (Basic):** Parses standard syslog messages to extract key fields (timestamp, level, source, process, message) and stores them in a structured format.
-*   **AI Data Transmission:** Periodically pushes structured log data (JSON format) to a configurable remote AI engine endpoint via HTTPS. Includes basic retry logic.
+*   **SSH Deployment:** Applies configurations and commands securely using Paramiko.
+*   **Secure Credential Management:** Encrypts stored SSH passwords and private keys using Fernet (`cryptography` library).
+*   **Log Processing:** Parses standard syslog messages and stores structured data.
+*   **AI Data Transmission:** Periodically pushes structured log data (JSON) to a configurable remote AI engine endpoint via HTTPS (optional feature).
 *   **Raspberry Pi 5 Optimized:** Designed with consideration for resource constraints.
 *   **Modular Backend:** Uses Flask blueprints and distinct service modules.
 
 ## Technology Stack
 
-*   **Backend:** Python 3, Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-APScheduler
-*   **Database:** SQLite (default), easily configurable for PostgreSQL
+*   **Backend:** Python 3, Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-APScheduler, Flask-Login, Flask-Limiter, Flask-Cors
+*   **Database:** SQLite (default for development), PostgreSQL (recommended for production)
 *   **SSH:** Paramiko
-*   **Syslog:** Python `socketserver` (for UDP listener)
+*   **Syslog:** Python `socketserver` (UDP listener)
 *   **HTTP Requests:** `requests`
 *   **Encryption:** `cryptography` (Fernet)
 *   **WSGI Server:** Gunicorn (for production)
-*   **Frontend:** React, React Router, Axios, Bootstrap, React-Bootstrap
+*   **Frontend:** React, React Router, Axios, Bootstrap, React-Bootstrap, react-bootstrap-icons
 *   **Testing:** Pytest (backend), Jest / React Testing Library (frontend)
 
 ## Project Structure
 
-```
+```txt
 Network_Monitor/
 ├── backend/
 │   ├── app/                # Main Flask application package
-│   │   ├── api/            # API Blueprints (devices.py, credentials.py, logs.py, uci.py)
-│   │   ├── models/         # SQLAlchemy models (device.py, credential.py, log_entry.py)
-│   │   ├── services/       # Business logic (ssh_manager.py, syslog_processor.py, ...)
-│   │   ├── static/         # (Optional) Static files served by Flask
-│   │   ├── templates/      # (Optional) Templates if not using pure SPA frontend
-│   │   ├── cli.py          # Custom Flask CLI commands
+│   │   ├── api/            # API Blueprints (auth.py, devices.py, credentials.py, logs.py, uci.py, dashboard.py)
+│   │   ├── models/         # SQLAlchemy models (user.py, device.py, credential.py, log_entry.py)
+│   │   ├── services/       # Business logic (ssh_manager.py, syslog_processor.py, ai_pusher.py, etc.)
+│   │   ├── static/         # (Not currently used by pure API)
+│   │   ├── templates/      # (Not currently used by pure API)
+│   │   ├── cli.py          # Custom Flask CLI command registration
 │   │   └── __init__.py     # Application factory (create_app)
-│   ├── data/               # Data files (e.g., app.db - SQLite database)
+│   ├── data/               # Default location for app.db (SQLite)
 │   ├── migrations/         # Flask-Migrate migration scripts
+│   ├── tests/              # Backend tests (pytest)
 │   ├── venv/               # Python virtual environment (ignored by git)
-│   └── config.py           # Configuration classes (Dev, Prod, Test)
+│   └── config.py           # Configuration classes (DevelopmentConfig, ProductionConfig, TestingConfig)
 ├── frontend/
 │   ├── node_modules/       # Node.js dependencies (ignored by git)
 │   ├── public/             # Static assets for React app
 │   ├── src/                # React source code
-│   │   ├── components/     # React components (DeviceList, LogList, Forms, Modals...)
+│   │   ├── components/     # React components (Dashboard, DeviceList, LogList, Forms, Modals...)
+│   │   ├── context/        # React Context (e.g., AuthContext)
 │   │   ├── services/       # API client (api.js)
 │   │   ├── App.js          # Main application component with routing
 │   │   ├── App.css         # Main styles
 │   │   └── index.js        # Entry point for React app
-│   ├── .env                # (Optional) Frontend environment variables
+│   ├── .env                # (Optional) Frontend environment variables (e.g., REACT_APP_API_BASE_URL)
 │   ├── package.json        # Frontend dependencies and scripts
-│   └── ...                 # Other React config/build files
-├── tests/                  # Backend tests (pytest)
-│   └── test_basic.py       # Example test file
-├── .env.example            # Example environment variables
+│   └── ...                 # Other React config/build files (setupTests.js, etc.)
+├── .env.example            # Example environment variables for backend
 ├── .gitignore              # Git ignore rules
-├── network-monitor-nginx.conf # Example Nginx configuration
+├── network-monitor-nginx.conf # Example Nginx configuration for deployment
 ├── network-monitor-syslog.service # Example systemd service for syslog listener
-├── network-monitor-web.service  # Example systemd service for web backend
+├── network-monitor-web.service  # Example systemd service for web backend (Gunicorn)
 ├── requirements.txt        # Backend Python dependencies
 └── README.md               # This file
 ```
 
 ## Development Setup
 
+These instructions guide setting up a local development environment.
+
 ### Backend
 
-1.  **Prerequisites:** Python 3.8+
-2.  **Clone:** `git clone <repository_url> Network_Monitor && cd Network_Monitor`
-3.  **Create Virtual Environment:** `python3 -m venv backend/venv`
-4.  **Activate Environment:**
+1.  **Prerequisites:** Python 3.8+ installed.
+2.  **Clone Repository:**
+    ```bash
+    git clone <repository_url> Network_Monitor
+    cd Network_Monitor
+    ```
+3.  **Create Python Virtual Environment:**
+    ```bash
+    python3 -m venv backend/venv
+    ```
+4.  **Activate Virtual Environment:**
     *   macOS/Linux: `source backend/venv/bin/activate`
-    *   Windows: `backend\\venv\\Scripts\\activate`
-5.  **Install Dependencies:** `pip install -r requirements.txt`
-6.  **Environment Variables:**
-    *   Copy `.env.example` to `.env` in the project root (`Network_Monitor/.env`).
-    *   **Crucially, generate and set `ENCRYPTION_KEY`**:
-        *   Run Python: `python`
-        *   Enter: `from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())`
-        *   Copy the output key into the `ENCRYPTION_KEY` field in `.env`.
-    *   Set `SECRET_KEY` to a strong random string.
-    *   Configure `DATABASE_URL` if not using the default SQLite path (`backend/data/app.db`).
-    *   Configure `AI_ENGINE_ENDPOINT`, `AI_ENGINE_API_KEY`, and `AI_PUSH_INTERVAL_MINUTES` if using the AI push feature.
-7.  **Database Initialization:**
+    *   Windows (Git Bash/WSL): `source backend/venv/bin/activate`
+    *   Windows (CMD): `backend\venv\Scripts\activate`
+    *   Windows (PowerShell): `backend\venv\Scripts\Activate.ps1`
+    *(Ensure the `(venv)` prefix appears in your terminal prompt.)*
+5.  **Install Dependencies:**
+    ```bash
+    # Ensure virtual environment is active
+    pip install -r requirements.txt
+    ```
+6.  **Configure Environment Variables:**
+    *   Copy the example environment file:
+        ```bash
+        cp .env.example .env
+        ```
+    *   **Edit the `.env` file** (in the `Network_Monitor` root directory):
+        *   Generate and set `SECRET_KEY` (e.g., using `openssl rand -hex 32`). **Required.**
+        *   Generate and set `ENCRYPTION_KEY` (e.g., using the Python command below). **Required.**
+            ```bash
+            # Ensure virtualenv is active first!
+            python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+            ```
+        *   Review `DATABASE_URL`. For development, leaving it commented out or empty typically defaults to SQLite (`backend/data/app.db`).
+        *   Configure `AI_ENGINE_*` variables if using the AI push feature.
+7.  **Initialize Database:**
     *   Ensure the virtual environment is active (`source backend/venv/bin/activate`).
     *   **Stay in the project root directory (`Network_Monitor`)**.
-    *   Set Flask environment variables **for the project root**:
-        *   macOS/Linux: `export FLASK_APP=backend.app:create_app && export FLASK_CONFIG=development`
-        *   Windows (Git Bash/WSL): `export FLASK_APP=backend.app:create_app && export FLASK_CONFIG=development`
-        *   Windows (CMD): `set FLASK_APP=backend.app:create_app && set FLASK_CONFIG=development`
-        *   Windows (PowerShell): `$env:FLASK_APP="backend.app:create_app"; $env:FLASK_CONFIG="development"`
-        *(Note: Using `backend.app:create_app` assumes you are running `flask` commands from the `Network_Monitor` project root directory.)*
-    *   Initialize migrations (only once per project): `flask db init`
-    *   Create migration script: `flask db migrate -m "Initial models"`
-    *   Apply migrations to create database: `flask db upgrade`
-8.  **Run Development Server:**
-    *   Ensure virtualenv is active (`source backend/venv/bin/activate`).
+    *   Set required Flask environment variables:
+        ```bash
+        # macOS / Linux / Git Bash / WSL:
+        export FLASK_APP=backend.app:create_app
+        export FLASK_CONFIG=development
+
+        # Windows (CMD):
+        # set FLASK_APP=backend.app:create_app
+        # set FLASK_CONFIG=development
+
+        # Windows (PowerShell):
+        # $env:FLASK_APP="backend.app:create_app"; $env:FLASK_CONFIG="development"
+        ```
+        *(These tell Flask how to load your app. Run these commands in the same terminal session where you run the `flask db` commands below.)*
+    *   Initialize the database migration repository (only run once per project):
+        ```bash
+        flask db init
+        ```
+    *   Generate the initial migration script based on your models:
+        ```bash
+        flask db migrate -m "Initial database schema"
+        ```
+    *   Apply the migration to create the database tables:
+        ```bash
+        flask db upgrade
+        ```
+8.  **Run Development Web Server:**
+    *   Ensure the virtual environment is active.
     *   **Stay in the project root directory (`Network_Monitor`)**.
-    *   Set Flask environment variables (if not already set in your session):
-        *   macOS/Linux: `export FLASK_APP=backend.app:create_app && export FLASK_CONFIG=development`
-        *   Windows: (Use appropriate command from step 7)
-    *   Run: `flask run`
-    *   The backend API will be available at `http://localhost:5000`.
-    *   The AI Pusher scheduler will start automatically.
+    *   Ensure `FLASK_APP` and `FLASK_CONFIG` are set (see step 7).
+    *   Run the Flask development server:
+        ```bash
+        flask run
+        ```
+    *   The backend API should now be running at `http://localhost:5000`.
+    *   The AI Pusher scheduler (if configured) will start automatically.
 
 ### Frontend
 
-1.  **Prerequisites:** Node.js (LTS recommended) and npm.
-2.  **Navigate:** `cd frontend` (from the `Network_Monitor` root)
-3.  **Install Dependencies:** `npm install`
-4.  **Run Development Server:** `npm start`
-    *   The frontend will open in your browser, usually at `http://localhost:3000`.
-    *   API requests to `/api/v1` will be automatically proxied to the backend server at `http://localhost:5000` (configured in `frontend/package.json`).
+1.  **Prerequisites:** Node.js (LTS recommended) and npm installed.
+2.  **Navigate to Frontend Directory:**
+    ```bash
+    cd frontend
+    ```
+3.  **Install Dependencies:**
+    ```bash
+    npm install
+    ```
+4.  **Run Development Server:**
+    ```bash
+    npm start
+    ```
+    *   The React frontend will open in your browser, usually at `http://localhost:3000`.
+    *   API requests from the frontend will target the backend server directly at `http://localhost:5000` (as configured in `src/services/api.js`).
 
 ## Running Background Tasks (Development)
 
-*   **AI Pusher:** Starts automatically when you run `flask run` due to APScheduler integration. It runs based on the `AI_PUSH_INTERVAL_MINUTES` setting in `.env`. Manually trigger with `flask trigger-ai-push`.
+*   **AI Pusher:** Starts automatically with `flask run` if configured in `.env`.
+    *   Manually trigger: `flask trigger-ai-push` (run from project root with venv active and env vars set).
 *   **Syslog Listener:**
-    *   Needs to run in a separate terminal from `flask run`.
+    *   Needs to run in a **separate terminal** from the main `flask run` process.
+    *   Navigate to the project root (`Network_Monitor`).
     *   Ensure the backend virtualenv is active (`source backend/venv/bin/activate`).
-    *   Run: `flask run-syslog --port 5140` (use a high port like 5140 for dev to avoid needing `sudo`).
-    *   Configure your OpenWRT devices to send syslog messages via UDP to your development machine's IP on port 5140.
-    *   **Important:** Make sure no other service (like the system `rsyslog`) is listening on the same port you specify.
+    *   Set Flask environment variables (see Backend Step 7).
+    *   Run the listener (use a high port like 5140 for dev to avoid needing `sudo`):
+        ```bash
+        # Example using port 5140
+        flask run-syslog --port 5140
+        ```
+    *   Configure your OpenWRT devices to send syslog messages via UDP to your development machine's IP on the chosen port (e.g., 5140).
+    *   **Important:** Make sure no other service (like the system `rsyslog` or another instance of this app) is listening on the same UDP port.
 
 ## Testing
 
 ### Backend
 
-1.  Ensure virtualenv is active and test dependencies are installed (`pip install -r requirements.txt`).
+1.  Ensure virtualenv is active (`source backend/venv/bin/activate`).
 2.  Navigate to the project root (`Network_Monitor/`).
-3.  Run: `pytest`
+3.  Run: `pytest backend/tests/`
     *   Tests use an in-memory SQLite database by default (`TestingConfig`).
 
 ### Frontend
 
-1.  Navigate to the frontend directory (`Network_Monitor/frontend/`).
+1.  Navigate to the frontend directory (`cd frontend`).
 2.  Run: `npm test`
-    *   This launches the Jest test runner in watch mode.
+    *   Launches the Jest test runner.
 
 ## Deployment (Raspberry Pi 5 Example)
 
-These steps provide a guided process for deploying the Network Monitor Hub on a Raspberry Pi OS (or similar Debian-based system). We recommend deploying in `/opt/network-monitor` using a dedicated user.
+These steps provide a general guide for deploying on a Debian-based system like Raspberry Pi OS. Adapt paths and user names as needed. Deploying under a dedicated user (e.g., `netmonitor`) in `/opt/network-monitor` is recommended.
 
 **Assumptions:**
-*   You are logged in as a user with `sudo` privileges (e.g., the default `pi` user).
-*   The Raspberry Pi has a static IP address on your network (recommended).
-*   Basic familiarity with the Linux command line.
+*   Target server has necessary base packages (Python 3, pip, venv, git, Node.js, npm, Nginx).
+*   You are logged in with `sudo` privileges.
+*   The server has a static IP or configured DNS.
 
-**1. System Preparation & Prerequisites**
+**1. System Preparation**
 
-*   **Update System:**
+*   **Update System & Install Packages:**
     ```bash
     sudo apt update && sudo apt upgrade -y
-    ```
-*   **Install Required Packages:**
-    ```bash
     sudo apt install -y python3 python3-pip python3-venv git nginx curl nodejs npm
     ```
-*   **(Optional but Recommended) Create Dedicated User:**
+*   **(Recommended) Create Dedicated User (`netmonitor`):**
     ```bash
-    sudo adduser netmonitor --disabled-password --gecos "" # Create user without password prompt
-    sudo usermod -aG sudo netmonitor # Add to sudo group if needed for management
-    sudo usermod -aG www-data netmonitor # Add to nginx group for socket access
-    sudo mkdir -p /home/netmonitor/.ssh
-    sudo cp ~/.ssh/authorized_keys /home/netmonitor/.ssh/ # Copy keys if needed
-    sudo chown -R netmonitor:netmonitor /home/netmonitor/.ssh
-    # Log in as the new user for subsequent steps (sudo su - netmonitor)
-    # Or prefix commands with: sudo -u netmonitor -i -- <<'EOF'
-    # YOUR_COMMANDS_HERE
-    # EOF
+    sudo adduser netmonitor --disabled-password --gecos ""
+    sudo usermod -aG www-data netmonitor # For Nginx socket access
+    # Optional: Add to sudo if needed for management tasks
+    # sudo usermod -aG sudo netmonitor
+    # Optional: Copy SSH keys if needed for direct login
+    # sudo mkdir -p /home/netmonitor/.ssh
+    # sudo cp ~/.ssh/authorized_keys /home/netmonitor/.ssh/
+    # sudo chown -R netmonitor:netmonitor /home/netmonitor/.ssh
     ```
-    *Note: If you use a different user, replace `netmonitor` in subsequent commands and service file configurations.* 
+    *(Adjust user/group in subsequent steps and service files if not using `netmonitor`.)*
 
-**2. Clone Application Code**
+**2. Deploy Application Code**
 
-*   **Clone the Repository:** (Run as the `netmonitor` user or adjust ownership later)
+*   **Create Directory & Clone:**
     ```bash
-    git clone <repository_url> /opt/network-monitor 
-    # If cloned as sudo/root, change ownership:
-    # sudo chown -R netmonitor:netmonitor /opt/network-monitor
+    sudo mkdir -p /opt/network-monitor
+    sudo chown netmonitor:netmonitor /opt/network-monitor # Assign ownership
+    sudo -u netmonitor git clone <repository_url> /opt/network-monitor
     cd /opt/network-monitor
     ```
 
 **3. Backend Setup**
 
-*   **Create Python Virtual Environment:**
+*   **Create Virtual Environment:**
     ```bash
-    # Ensure you are in /opt/network-monitor
-    # Run as netmonitor user if possible:
-    # sudo -u netmonitor -i python3 -m venv backend/venv
-    python3 -m venv backend/venv 
+    sudo -u netmonitor python3 -m venv backend/venv
     ```
 *   **Activate Virtual Environment:**
     ```bash
@@ -207,193 +256,161 @@ These steps provide a guided process for deploying the Network Monitor Hub on a 
     ```
 *   **Install Python Dependencies:**
     ```bash
-    # Ensure venv active
     pip install -r requirements.txt
-    pip install gunicorn # Install Gunicorn for production server
+    pip install gunicorn # Production WSGI server
     ```
 *   **Configure Environment (`.env` file):**
-    *   Copy the example: `cp .env.example .env`
-    *   **Generate Encryption Key:** Run this command and copy the output:
-        ```bash
-        # Ensure venv active
-        python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-        ```
-    *   **Edit `.env` file:** `nano .env`
-        *   Paste the generated key into `ENCRYPTION_KEY=`. **KEEP THIS KEY SAFE!**
-        *   Set `SECRET_KEY=` to a long, random string (e.g., use `openssl rand -hex 32` to generate one).
+    *   `sudo -u netmonitor cp .env.example .env`
+    *   **Edit `.env` as the `netmonitor` user:** `sudo -u netmonitor nano .env`
         *   Set `FLASK_CONFIG=production`.
-        *   Review `DATABASE_URL` (default SQLite is `sqlite:////opt/network-monitor/backend/data/app.db`).
-        *   Configure `AI_ENGINE_ENDPOINT`, `AI_ENGINE_API_KEY`, `AI_PUSH_INTERVAL_MINUTES` if using the AI push feature.
-    *   **Set Permissions for `.env`:**
-        ```bash
-        # Ensure ownership is correct (e.g., netmonitor:netmonitor if using that user)
-        # sudo chown netmonitor:netmonitor .env 
-        chmod 600 .env 
-        ```
-*   **Initialize/Upgrade Database:**
+        *   Set a strong `SECRET_KEY`.
+        *   Generate and set a unique `ENCRYPTION_KEY` (see Dev Setup Step 6) - **Backup this key!**
+        *   Set `DATABASE_URL` (Strongly recommend PostgreSQL for production).
+        *   Configure `FRONTEND_ORIGIN` if your frontend is served from a different domain/port than the backend API.
+        *   Configure `AI_ENGINE_*` variables if used.
+        *   Review `SYSLOG_UDP_PORT` (default 514).
+    *   **Set Permissions:** `sudo -u netmonitor chmod 600 .env`
+*   **Apply Database Migrations:**
     ```bash
-    # Ensure venv is active: source backend/venv/bin/activate
-    flask db upgrade # Creates DB and applies migrations
+    # Ensure venv active
+    # Set ENV variables for flask command
+    export FLASK_APP=backend.app:create_app
+    export FLASK_CONFIG=production
+    flask db upgrade # Apply migrations
+    unset FLASK_APP FLASK_CONFIG # Unset temporary variables
     ```
-*   **Create Data Directory (if needed) and Set Permissions:**
+*   **Create Data Directory (if using SQLite - not recommended for prod):**
     ```bash
-    mkdir -p backend/data
-    # Ensure the user running the services (netmonitor) can write here
-    # sudo chown -R netmonitor:netmonitor backend/data 
-    # (If running as netmonitor, permissions should be okay)
+    # sudo -u netmonitor mkdir -p backend/data
     ```
 *   **Deactivate venv for now:** `deactivate`
 
 **4. Frontend Build**
 
-*   **Navigate to Frontend Directory:**
+*   **Navigate & Install Dependencies:**
     ```bash
     cd frontend
-    ```
-*   **Install Dependencies:**
-    ```bash
+    # Run npm install as the user who owns the directory if possible
+    # If sudo is needed, ensure permissions are fixed later if necessary
     npm install
     ```
 *   **Build Static Files:**
     ```bash
     npm run build # Output goes to frontend/build/
     ```
-*   **Return to Project Root:**
+*   **Return to Project Root:** `cd ..`
+*   **(Optional) Fix Permissions:** If `npm install/build` created files as root, ensure the `netmonitor` user or `www-data` group can access the `frontend/build` directory as needed by Nginx.
     ```bash
-    cd ..
+    # Example: sudo chown -R netmonitor:netmonitor frontend/
     ```
 
 **5. Configure System Services (systemd)**
 
-*This setup uses the application's built-in syslog listener.* 
-
-*   **(Important) Disable System Syslog Listener (if running):** We need port 514 for the app.
+*   **(Important) Disable System Syslog:** If using the app's listener on port 514.
     ```bash
-    sudo systemctl stop rsyslog # Or syslog-ng
-    sudo systemctl disable rsyslog # Or syslog-ng
+    sudo systemctl stop rsyslog && sudo systemctl disable rsyslog
     ```
 *   **Prepare Service Files:**
-    *   Review the example service files (`network-monitor-web.service`, `network-monitor-syslog.service`).
-    *   **Crucially, ensure paths and user/group match your setup.** 
-        *   Edit the files (`nano network-monitor-web.service`, etc.).
-        *   Verify `User=netmonitor`, `Group=netmonitor` (or your chosen user/group).
-        *   Verify `WorkingDirectory=/opt/network-monitor`.
-        *   Verify paths to `gunicorn`, `flask` (e.g., `/opt/network-monitor/backend/venv/bin/gunicorn`).
-        *   Verify the socket path (`/tmp/network-monitor.sock`) matches the Nginx config.
-*   **Copy Service Files:**
+    *   Review `network-monitor-web.service` and `network-monitor-syslog.service`.
+    *   **Verify paths:** `WorkingDirectory`, `ExecStart` (path to `gunicorn`/`flask` in venv).
+    *   **Verify:** `User=netmonitor`, `Group=netmonitor` (or your chosen user/group).
+    *   Ensure the `.sock` path matches the Nginx config.
+    *   Make sure the `Environment` lines correctly point to your `.env` file and set `FLASK_CONFIG=production`.
+*   **Copy, Enable & Start Services:**
     ```bash
     sudo cp network-monitor-web.service /etc/systemd/system/
     sudo cp network-monitor-syslog.service /etc/systemd/system/
-    ```
-*   **Reload systemd, Enable & Start Services:**
-    ```bash
     sudo systemctl daemon-reload
-    sudo systemctl enable network-monitor-web.service
-    sudo systemctl enable network-monitor-syslog.service
-    sudo systemctl start network-monitor-web.service
-    sudo systemctl start network-monitor-syslog.service
+    sudo systemctl enable --now network-monitor-web.service # Enable and start
+    sudo systemctl enable --now network-monitor-syslog.service # Enable and start
     ```
-*   **Check Service Status:**
+*   **Check Status:**
     ```bash
-    sudo systemctl status network-monitor-web.service
-    sudo systemctl status network-monitor-syslog.service
-    # View logs if needed:
-    # sudo journalctl -u network-monitor-web.service -f
-    # sudo journalctl -u network-monitor-syslog.service -f 
+    sudo systemctl status network-monitor-web.service network-monitor-syslog.service
+    # View logs: sudo journalctl -u network-monitor-web -f
     ```
 
 **6. Configure Web Server (Nginx)**
 
-*   **Prepare Nginx Configuration:**
-    *   Edit the example file: `nano network-monitor-nginx.conf`
-    *   Replace `YOUR_SERVER_IP_OR_HOSTNAME` with your Pi's actual IP address or DNS name.
-    *   Verify `root /opt/network-monitor/frontend/build;` points to the correct build output.
-    *   Verify `proxy_pass unix:/tmp/network-monitor.sock;` matches the socket path in `network-monitor-web.service`.
+*   **Prepare Nginx Configuration (`network-monitor-nginx.conf`):**
+    *   Replace `YOUR_SERVER_IP_OR_HOSTNAME` with your server's actual IP/DNS name.
+    *   Verify `root /opt/network-monitor/frontend/build;` is correct.
+    *   Verify `proxy_pass unix:/tmp/network-monitor.sock;` matches the systemd service.
+    *   **(Recommended)** Add configuration for HTTPS (e.g., using Let's Encrypt).
 *   **Copy & Enable Nginx Site:**
     ```bash
     sudo cp network-monitor-nginx.conf /etc/nginx/sites-available/network-monitor
     sudo ln -s /etc/nginx/sites-available/network-monitor /etc/nginx/sites-enabled/
-    # Remove default site if it exists to avoid conflicts
-    sudo rm -f /etc/nginx/sites-enabled/default 
+    sudo rm -f /etc/nginx/sites-enabled/default # Avoid conflicts
     ```
 *   **Test and Restart Nginx:**
     ```bash
-    sudo nginx -t # Test configuration
+    sudo nginx -t
     sudo systemctl restart nginx
     ```
 
 **7. Final Steps & Verification**
 
-*   **Configure OpenWRT Devices:** Point your OpenWRT devices' remote syslog settings to your Raspberry Pi's IP address, using UDP port 514.
-*   **Access Web UI:** Open a web browser and navigate to `http://<YOUR_SERVER_IP_OR_HOSTNAME>`.
-*   **Create Admin User:** Access the server and run (ensure venv is active):
+*   **Configure Firewall:** Ensure ports (e.g., 80/443 for HTTP/S, 514/UDP for syslog) are open.
+*   **Configure OpenWRT Devices:** Point remote syslog to your server's IP, using the configured UDP port (e.g., 514).
+*   **Access Web UI:** `http(s)://<YOUR_SERVER_IP_OR_HOSTNAME>`.
+*   **Create Admin User:**
     ```bash
     cd /opt/network-monitor
     source backend/venv/bin/activate
-    # You might need to run flask db upgrade again here if it failed earlier due to permissions
-    # flask db upgrade 
-    flask create-user <username> <password>
+    export FLASK_APP=backend.app:create_app
+    export FLASK_CONFIG=production
+    flask create-user <username> <password> # Follow prompts
+    unset FLASK_APP FLASK_CONFIG
     deactivate
     ```
-*   **Log In:** Use the credentials created above to log into the web UI.
-*   **Test Functionality:**
-    *   Check if logs from your OpenWRT devices appear in the UI.
-    *   Add devices and credentials.
-    *   Test credential association and verification.
-    *   Test log configuration toggle.
-    *   Test applying UCI commands via the modal (`/apply_config` endpoint).
-    *   Test device reboot.
-    *   Test device status refresh.
-*   **Monitor Logs:** Keep an eye on systemd service logs (`journalctl`) for any errors during operation.
+*   **Log In & Test Functionality.**
+*   **Monitor Logs:** `sudo journalctl -u network-monitor-web -f` and `-u network-monitor-syslog -f`.
 
 ## Configuration Details
 
-*   **Backend:** Main configuration is handled by `backend/config.py`, reading from `/opt/network-monitor/.env`. Key settings include `DATABASE_URL`, `SECRET_KEY`, `ENCRYPTION_KEY`.
-*   **Device Control:** Devices have a `control_method` attribute (default: `ssh`). Backend uses a controller pattern (`services/controllers.py`) to abstract interaction (currently `SSHDeviceController`).
-*   **Frontend:** API requests are proxied by Nginx to the backend Gunicorn server via a Unix socket (`/tmp/network-monitor.sock`).
-*   **Services:** Managed by `systemd` using the provided `.service` files. Logs viewable via `journalctl`.
+*   **Backend:** Configured via `backend/config.py` and environment variables loaded from `.env` (see `.env.example`).
+*   **Frontend:** API endpoint configured in `frontend/src/services/api.js`.
+*   **Deployment:** Nginx acts as reverse proxy; Gunicorn runs the Flask app; systemd manages services.
 
 ## Updating the Application
 
-1.  Navigate to the application directory: `cd /opt/network-monitor`
-2.  Stop the services: `sudo systemctl stop network-monitor-web.service network-monitor-syslog.service`
-3.  Pull the latest code: `git pull origin main` (or your branch)
-4.  Update backend dependencies (if `requirements.txt` changed):
+1.  Navigate to `/opt/network-monitor`.
+2.  Stop services: `sudo systemctl stop network-monitor-web network-monitor-syslog`.
+3.  Pull latest code: `sudo -u netmonitor git pull origin main` (or your branch).
+4.  Update backend dependencies & DB:
     ```bash
     source backend/venv/bin/activate
     pip install -r requirements.txt
-    # Apply any new database migrations
-    flask db upgrade 
+    export FLASK_APP=backend.app:create_app
+    export FLASK_CONFIG=production
+    flask db upgrade # Apply new migrations
+    unset FLASK_APP FLASK_CONFIG
     deactivate
     ```
-5.  Rebuild frontend (if frontend code changed):
+5.  Rebuild frontend (if changed):
     ```bash
     cd frontend
-    npm install # If package.json changed
-    npm run build
+    # sudo -u netmonitor npm install # If package.json changed
+    # sudo -u netmonitor npm run build
     cd ..
+    # Fix permissions if needed
     ```
-6.  Copy updated service or Nginx files if they changed:
-    ```bash
-    # Example: sudo cp network-monitor-web.service /etc/systemd/system/
-    # Example: sudo cp network-monitor-nginx.conf /etc/nginx/sites-available/network-monitor
-    ```
-7.  Reload daemons and restart services:
+6.  Copy updated service/Nginx files if they changed.
+7.  Reload & Restart:
     ```bash
     sudo systemctl daemon-reload # If service files changed
     # sudo nginx -t && sudo systemctl restart nginx # If nginx config changed
-    sudo systemctl start network-monitor-web.service network-monitor-syslog.service
+    sudo systemctl start network-monitor-web network-monitor-syslog
     ```
 
 ## Future Enhancements
 
-*   More sophisticated UI/UX (theming, dashboard, detailed views, better notifications).
-*   Expanded UCI configuration options in the UI (e.g., WiFi, firewall rules).
-*   User interface for selecting device `control_method` (SSH/REST).
-*   Implementation of `RESTDeviceController`.
-*   Advanced log parsing (e.g., key-value extraction from messages).
-*   More robust error handling and reporting.
-*   Enhanced background task management (e.g., using Celery).
-*   Comprehensive backend and frontend test coverage.
-*   Option to configure syslog listener port/protocol (TCP).
-*   HTTPS setup for Nginx (using Let's Encrypt or self-signed certs). 
+*   More sophisticated UI/UX (theming, dashboard improvements, better notifications).
+*   Expanded UCI configuration options.
+*   REST API controller for devices.
+*   Advanced log parsing/analysis.
+*   Enhanced background task management (Celery).
+*   Comprehensive test coverage.
+*   Syslog over TCP/TLS.
+*   HTTPS setup via Let's Encrypt/Certbot. 
