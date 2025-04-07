@@ -94,27 +94,25 @@ Network_Monitor/
     *   Configure `AI_ENGINE_ENDPOINT`, `AI_ENGINE_API_KEY`, and `AI_PUSH_INTERVAL_MINUTES` if using the AI push feature.
 7.  **Database Initialization:**
     *   Ensure the virtual environment is active (`source backend/venv/bin/activate`).
-    *   **Navigate to the `backend` directory:** `cd backend`
-    *   Set Flask environment variables **for the `backend` directory**:
-        *   macOS/Linux: `export FLASK_APP=app:create_app && export FLASK_CONFIG=development`
-        *   Windows (Git Bash/WSL): `export FLASK_APP=app:create_app && export FLASK_CONFIG=development`
-        *   Windows (CMD): `set FLASK_APP=app:create_app && set FLASK_CONFIG=development`
-        *   Windows (PowerShell): `$env:FLASK_APP="app:create_app"; $env:FLASK_CONFIG="development"`
-        *(Note: Using `app:create_app` assumes you are running `flask` commands from within the `backend` directory.)*
+    *   **Stay in the project root directory (`Network_Monitor`)**.
+    *   Set Flask environment variables **for the project root**:
+        *   macOS/Linux: `export FLASK_APP=backend.app:create_app && export FLASK_CONFIG=development`
+        *   Windows (Git Bash/WSL): `export FLASK_APP=backend.app:create_app && export FLASK_CONFIG=development`
+        *   Windows (CMD): `set FLASK_APP=backend.app:create_app && set FLASK_CONFIG=development`
+        *   Windows (PowerShell): `$env:FLASK_APP="backend.app:create_app"; $env:FLASK_CONFIG="development"`
+        *(Note: Using `backend.app:create_app` assumes you are running `flask` commands from the `Network_Monitor` project root directory.)*
     *   Initialize migrations (only once per project): `flask db init`
     *   Create migration script: `flask db migrate -m "Initial models"`
     *   Apply migrations to create database: `flask db upgrade`
-    *   **Return to project root:** `cd ..`
 8.  **Run Development Server:**
     *   Ensure virtualenv is active (`source backend/venv/bin/activate`).
-    *   **Navigate to the `backend` directory:** `cd backend`
+    *   **Stay in the project root directory (`Network_Monitor`)**.
     *   Set Flask environment variables (if not already set in your session):
-        *   macOS/Linux: `export FLASK_APP=app:create_app && export FLASK_CONFIG=development`
+        *   macOS/Linux: `export FLASK_APP=backend.app:create_app && export FLASK_CONFIG=development`
         *   Windows: (Use appropriate command from step 7)
     *   Run: `flask run`
     *   The backend API will be available at `http://localhost:5000`.
     *   The AI Pusher scheduler will start automatically.
-    *   **Return to project root:** `cd ..`
 
 ### Frontend
 
