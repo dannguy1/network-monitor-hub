@@ -1,3 +1,5 @@
+/* Remove or comment out default CRA styles if no longer needed */
+/*
 .App {
   text-align: center;
 }
@@ -35,4 +37,63 @@
   to {
     transform: rotate(360deg);
   }
+}
+*/
+
+/* Ensure full height for layout */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Top Navigation Bar */
+.top-navbar {
+  height: 56px; /* Standard navbar height */
+  position: sticky; /* Keep it sticky if desired, or fixed */
+  top: 0;
+  z-index: 1030; /* Ensure it's above other content */
+}
+
+/* Container adjustments to account for top bar */
+.container-fluid.h-100 {
+  height: calc(100% - 56px) !important; /* Subtract navbar height */
+}
+
+/* Sidebar Styling */
+.sidebar {
+  /* Removed fixed position - rely on Row/Col layout */
+  /* Position fixed causes issues with scroll */
+  height: 100%; /* Take full height of the row */
+  padding-top: 1rem; /* Add some top padding */
+  overflow-y: auto; /* Allow scrolling if content overflows */
+}
+
+.sidebar .nav-link {
+  color: rgba(255, 255, 255, 0.7); /* Default link color */
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; /* Smooth transition */
+}
+
+.sidebar .nav-link:hover {
+  color: white;
+  background-color: #495057; /* Match active style on hover */
+}
+
+.sidebar .nav-link.active {
+    /* Styles are now handled inline in App.js via navLinkStyle, */
+    /* but you could override here if needed */
+    /* color: white; */
+    /* background-color: #495057; */
+    /* font-weight: bold; */
+}
+
+/* Main Content Area */
+.main-content {
+  height: 100%; /* Take full height of the row */
+  overflow-y: auto; /* Allow content to scroll independently */
+  padding: 2rem; /* Add more padding */
+}
+
+/* Utility class for full height */
+.vh-100 {
+    height: 100vh !important;
 }

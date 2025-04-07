@@ -1,61 +1,76 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert, Button, Spinner } from 'react-bootstrap'; // Added Button, Spinner
+import { Alert, Button, Spinner, Table, Card, Badge, ButtonGroup, Form } from 'react-bootstrap';
 import api from '../services/api';
-import DeviceForm from './DeviceForm'; // Import the form component
-import ApplyUciModal from './ApplyUciModal'; // Import the modal
+import DeviceForm from './DeviceForm';
+import ApplyUciModal from './ApplyUciModal';
+import { PencilSquare, Trash, Key, CheckCircle, XCircle, ArrowRepeat, GearFill, Power, CloudArrowUpFill, CloudSlashFill } from 'react-bootstrap-icons';
 
 function DeviceList() {
     const [devices, setDevices] = useState([]);
-    const [credentials, setCredentials] = useState([]); // Add state for credentials
+    const [credentials, setCredentials] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showForm, setShowForm] = useState(false);
-    const [editingDevice, setEditingDevice] = useState(null); // null for create, device object for edit
-    const [actionError, setActionError] = useState(null); // For errors from actions
-    const [actionMessage, setActionMessage] = useState(null); // For success messages
-    const [selectedCredential, setSelectedCredential] = useState({}); // Store selected credential ID per device { deviceId: credId }
-    const [verificationStatus, setVerificationStatus] = useState({}); // { credId: { status, message } }
-    const [showUciModal, setShowUciModal] = useState(false); // State for UCI modal
-    const [uciTargetDevice, setUciTargetDevice] = useState(null); // Device for UCI modal
-    const [logConfigStatus, setLogConfigStatus] = useState({}); // { deviceId: { loading, enabled, target, error } }
-    const [rebootingDevice, setRebootingDevice] = useState(null); // Track which device is rebooting
-    const [refreshingDevice, setRefreshingDevice] = useState(null); // Track which device status is refreshing
+    const [editingDevice, setEditingDevice] = useState(null);
+    const [actionError, setActionError] = useState(null);
+    const [actionMessage, setActionMessage] = useState(null);
+    const [selectedCredential, setSelectedCredential] = useState({});
+    const [verificationStatus, setVerificationStatus] = useState({});
+    const [showUciModal, setShowUciModal] = useState(false);
+    const [uciTargetDevice, setUciTargetDevice] = useState(null);
+    const [logConfigStatus, setLogConfigStatus] = useState({});
+    const [rebootingDevice, setRebootingDevice] = useState(null);
+    const [refreshingDevice, setRefreshingDevice] = useState(null);
 
-    // Use useCallback to memoize fetch calls
-    const fetchDevices = useCallback(() => {
-        // Keep loading true until both devices and credentials are fetched
+    const fetchDevices = useCallback((clearActionFeedback = true) => {
+        if (clearActionFeedback) {
+            setActionError(null);
+            setActionMessage(null);
+        }
         setLoading(true);
-        // Do not clear primary error on refetch, only action errors
-        // setError(null);
-        // Use Promise.all to fetch both devices and credentials concurrently
+
         Promise.all([
             api.getDevices(),
             api.getCredentials()
         ])
         .then(([devicesResponse, credentialsResponse]) => {
-            setDevices(devicesResponse.data);
-            setCredentials(credentialsResponse.data);
-            setError(null); // Clear primary error only on success
-            setLoading(false);
-            // Fetch log config for each device *after* initial load
-            devicesResponse.data.forEach(device => fetchLogConfig(device.id));
+            const fetchedDevices = devicesResponse.data || [];
+            setDevices(fetchedDevices);
+            setCredentials(credentialsResponse.data || []);
+            setError(null);
+
+            const initialLogStatus = {};
+            fetchedDevices.forEach(device => {
+                initialLogStatus[device.id] = { loading: false, enabled: undefined, target: undefined, error: null };
+                if (device.credential_id) {
+                   fetchLogConfig(device.id, fetchedDevices);
+                } else {
+                   initialLogStatus[device.id] = { loading: false, error: 'No credential associated' };
+                }
+                if (!selectedCredential[device.id]) {
+                    setSelectedCredential(prev => ({ ...prev, [device.id]: '' }));
+                }
+            });
+            setLogConfigStatus(initialLogStatus);
+
         })
         .catch(err => {
             console.error("Error fetching data:", err);
             setError(err.response?.data?.error || err.message || 'Failed to fetch data');
+        })
+        .finally(() => {
             setLoading(false);
         });
-    }, []);
+    }, [selectedCredential]);
 
     useEffect(() => {
-        fetchDevices();
-    }, [fetchDevices]); // Fetch data on mount
+        fetchDevices(true);
+    }, []);
 
-    // Clear action messages/errors and verification statuses
     const clearActionFeedback = () => {
         setActionError(null);
         setActionMessage(null);
-        setVerificationStatus({}); // Clear all verification statuses
+        setVerificationStatus({});
     };
 
     const handleCreate = (formData) => {
@@ -63,8 +78,8 @@ function DeviceList() {
         api.createDevice(formData)
             .then(() => {
                 setActionMessage(`Device '${formData.name}' created successfully.`);
-                fetchDevices(); // Re-fetch the list
-                setShowForm(false); // Hide form
+                fetchDevices(false);
+                setShowForm(false);
             })
             .catch(err => {
                 console.error("Error creating device:", err);
@@ -78,7 +93,7 @@ function DeviceList() {
         api.updateDevice(editingDevice.id, formData)
             .then(() => {
                 setActionMessage(`Device '${formData.name}' updated successfully.`);
-                fetchDevices(); // Re-fetch the list
+                fetchDevices(false);
                 setShowForm(false);
                 setEditingDevice(null);
             })
@@ -90,11 +105,11 @@ function DeviceList() {
 
     const handleDelete = (device) => {
         clearActionFeedback();
-        if (window.confirm(`Are you sure you want to delete device '${device.name}'?`)) {
+        if (window.confirm(`Are you sure you want to delete device '${device.name}'? This cannot be undone.`)) {
             api.deleteDevice(device.id)
                 .then(() => {
                     setActionMessage(`Device '${device.name}' deleted successfully.`);
-                    fetchDevices(); // Re-fetch the list
+                    fetchDevices(false);
                 })
                 .catch(err => {
                     console.error("Error deleting device:", err);
@@ -103,7 +118,6 @@ function DeviceList() {
         }
     };
 
-    // --- Association Handlers ---
     const handleAssociate = (deviceId) => {
         clearActionFeedback();
         const credId = selectedCredential[deviceId];
@@ -114,8 +128,8 @@ function DeviceList() {
         api.associateCredential(deviceId, credId)
             .then(response => {
                 setActionMessage(response.data.message || `Credential associated successfully.`);
-                setSelectedCredential(prev => ({...prev, [deviceId]: ''})); // Clear selection for this device
-                fetchDevices(); // Re-fetch to update device state
+                setSelectedCredential(prev => ({...prev, [deviceId]: ''}));
+                fetchDevices();
             })
             .catch(err => {
                  console.error("Error associating credential:", err);
@@ -129,7 +143,7 @@ function DeviceList() {
             api.disassociateCredential(deviceId)
                 .then(response => {
                     setActionMessage(response.data.message || `Credential disassociated successfully.`);
-                    fetchDevices(); // Re-fetch to update device state
+                    fetchDevices();
                 })
                 .catch(err => {
                     console.error("Error disassociating credential:", err);
@@ -143,29 +157,31 @@ function DeviceList() {
             ...prev,
             [deviceId]: event.target.value
         }));
+        const device = devices.find(d => d.id === deviceId);
+        if (device && device.credential_id) {
+            setVerificationStatus(prev => {
+                 const newStatus = { ...prev };
+                 delete newStatus[device.credential_id];
+                 return newStatus;
+             });
+        }
     };
-    // --- End Association Handlers ---
 
-    // --- Verification Handler ---
     const handleVerify = (credentialId) => {
         clearActionFeedback();
-        setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'loading', message: 'Verifying...' } }));
+         setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'loading', message: 'Verifying...' } }));
 
         api.verifyCredential(credentialId)
             .then(response => {
                 setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'success', message: response.data.message || 'Verification Successful' } }));
-                // Optionally update device status if backend doesn't trigger a full refresh
-                // fetchDevices(); // Or update device status directly in state if preferred
             })
             .catch(err => {
                  console.error("Error verifying credential:", err);
-                 const errMsg = err.response?.data?.message || err.message || 'Verification Failed';
+                 const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Verification Failed';
                  setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'error', message: errMsg } }));
             });
     };
-    // --- End Verification Handler ---
 
-    // --- UCI Apply Handlers ---
     const openUciModal = (device) => {
         if (!device.credential_id) {
             clearActionFeedback();
@@ -183,16 +199,13 @@ function DeviceList() {
 
         try {
             const response = await api.applyUciToDevice(uciTargetDevice.id, uciCommands);
-            // Show success message briefly
             setActionMessage(`UCI commands applied successfully to ${uciTargetDevice.name}.`);
-             // Automatically clear message after a few seconds
             setTimeout(() => setActionMessage(null), 5000);
             
-            // Show full output in console for now
             console.log("Apply UCI STDOUT:", response.data.stdout);
             if (response.data.stderr) {
                 console.warn("Apply UCI STDERR:", response.data.stderr);
-                 setActionError(`Apply UCI completed with errors: ${response.data.stderr.substring(0, 100)}... (See console)`); // Show snippet
+                 setActionError(`Apply UCI completed with errors: ${response.data.stderr.substring(0, 100)}... (See console)`);
             }
             
             setShowUciModal(false);
@@ -200,7 +213,6 @@ function DeviceList() {
         } catch (err) {
             console.error("Error applying UCI commands:", err);
             const errMsg = err.response?.data?.stderr || err.response?.data?.error || err.message || 'Failed to apply UCI commands';
-            // Let the modal show the error directly for immediate feedback
             throw new Error(errMsg);
         }
     };
@@ -209,61 +221,67 @@ function DeviceList() {
         setShowUciModal(false);
         setUciTargetDevice(null);
     };
-    // --- End UCI Apply Handlers ---
 
-    // --- Log Config Handlers ---
-    const fetchLogConfig = useCallback(async (deviceId) => {
-         // Only fetch if credential exists for the device
-         const device = devices.find(d => d.id === deviceId);
+    const fetchLogConfig = useCallback(async (deviceId, currentDevices) => {
+        const device = currentDevices.find(d => d.id === deviceId);
          if (!device || !device.credential_id) {
-             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: false, error: 'No credential associated' } }));
+             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: false, error: 'No credential' } }));
              return;
          }
 
-        setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: true } }));
+        setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...prev[deviceId], loading: true, error: null } }));
         try {
             const response = await api.getLogConfig(deviceId);
-            setLogConfigStatus(prev => ({ 
-                ...prev, 
-                [deviceId]: { 
-                    loading: false, 
-                    enabled: response.data.remote_logging_enabled, 
-                    target: response.data.remote_log_target, 
-                    error: null 
-                } 
+            setLogConfigStatus(prev => ({
+                ...prev,
+                [deviceId]: {
+                    loading: false,
+                    enabled: response.data.remote_logging_enabled,
+                    target: response.data.remote_log_target,
+                    error: null
+                }
             }));
         } catch (err) {
             console.error(`Error fetching log config for device ${deviceId}:`, err);
-            setLogConfigStatus(prev => ({ 
-                ...prev, 
-                [deviceId]: { 
-                    loading: false, 
-                    error: err.response?.data?.error || err.message || 'Failed to fetch status' 
-                } 
+             const errMsg = err.response?.data?.error || err.message || 'Failed to fetch status';
+             setLogConfigStatus(prev => ({
+                ...prev,
+                [deviceId]: {
+                     ...(prev[deviceId] || {}),
+                    loading: false,
+                     error: errMsg
+                }
             }));
         }
-    }, [devices]); // Depend on devices list to find credential ID
+    }, []);
 
     const handleToggleLogConfig = async (deviceId, currentState) => {
         clearActionFeedback();
         const newState = !currentState;
-        setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...prev[deviceId], loading: true } })); // Show loading
-        
+        const originalStatus = logConfigStatus[deviceId];
+        setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...prev[deviceId], loading: true, error: null } }));
+
         try {
-            await api.setLogConfig(deviceId, newState);
-            setActionMessage(`Remote logging ${newState ? 'enabled' : 'disabled'} successfully for device ID ${deviceId}.`);
-            // Refetch status after successful toggle
-            fetchLogConfig(deviceId);
+            const response = await api.toggleLogConfig(deviceId, newState);
+            setLogConfigStatus(prev => ({
+                ...prev,
+                [deviceId]: {
+                    loading: false,
+                    enabled: response.data.remote_logging_enabled,
+                    target: response.data.remote_log_target,
+                    error: null
+                }
+            }));
+             setActionMessage(`Remote logging ${newState ? 'enabled' : 'disabled'} for device.`);
+             setTimeout(() => setActionMessage(null), 3000);
         } catch (err) {
             console.error(`Error toggling log config for device ${deviceId}:`, err);
-            setActionError(err.response?.data?.error || err.message || `Failed to ${newState ? 'enable' : 'disable'} logging`);
-             // Reset loading state on error for the specific device
-            setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...prev[deviceId], loading: false } }));
+            const errMsg = err.response?.data?.error || err.message || 'Failed to toggle logging';
+             setActionError(errMsg);
+             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...originalStatus, loading: false, error: errMsg } }));
         }
     };
-    // --- End Log Config Handlers ---
 
-    // --- Reboot Handler ---
     const handleReboot = async (device) => {
         clearActionFeedback();
         if (!device.credential_id) {
@@ -271,63 +289,34 @@ function DeviceList() {
             return;
         }
         if (window.confirm(`Are you sure you want to reboot device '${device.name}'?`)) {
-            setRebootingDevice(device.id); // Set loading state for this device
-            setActionMessage(null); // Clear previous messages
+            setRebootingDevice(device.id);
+            setActionMessage(null);
             setActionError(null);
             try {
                 const response = await api.rebootDevice(device.id);
-                // Show success message (even if connection drops)
                 setActionMessage(response.data.message || `Reboot command sent successfully to ${device.name}. Device may take a moment to restart.`);
-                 // Optionally update device status to 'Rebooting' or 'Unknown'
-                 // setDevices(prev => prev.map(d => d.id === device.id ? {...d, status: 'Rebooting'} : d));
             } catch (err) {
                 console.error("Error rebooting device:", err);
                 setActionError(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to send reboot command');
             } finally {
-                setRebootingDevice(null); // Clear loading state regardless of outcome
+                setRebootingDevice(null);
             }
         }
     };
-    // --- End Reboot Handler ---
 
-    // --- Refresh Status Handler ---
     const handleRefreshStatus = async (deviceId) => {
         clearActionFeedback();
-        setRefreshingDevice(deviceId); // Set loading state
-        setActionMessage(null); // Clear previous messages
-        setActionError(null);
-        try {
-            const response = await api.refreshDeviceStatus(deviceId);
-            setActionMessage(response.data.message || `Status refresh attempt complete.`);
-            
-            // Update the device list state directly with the new status
-            setDevices(prevDevices => 
-                prevDevices.map(d => 
-                    d.id === deviceId 
-                        ? { ...d, status: response.data.device_status, last_seen: response.data.last_seen }
-                        : d
-                )
-            );
-            // Clear verification status for this credential if it existed, as we just refreshed
-            const device = devices.find(d => d.id === deviceId);
-            if (device && device.credential_id) {
-                setVerificationStatus(prev => {
-                    const { [device.credential_id]: _, ...rest } = prev; // Remove status for this credential
-                    return rest;
-                });
-            }
-
-        } catch (err) {
-            console.error("Error refreshing device status:", err);
-            const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to refresh status';
-            setActionError(errMsg);
-             // Optionally update status to 'Unknown' or keep old one on error
-             // setDevices(prevDevices => prevDevices.map(d => d.id === deviceId ? { ...d, status: 'Refresh Error' } : d));
-        } finally {
-            setRefreshingDevice(null); // Clear loading state
+        setRefreshingDevice(deviceId);
+        const device = devices.find(d => d.id === deviceId);
+        if (device && device.credential_id) {
+            await fetchLogConfig(deviceId, devices);
+        } else {
+            setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: false, error: 'No credential' } }));
         }
+        setRefreshingDevice(null);
+         setActionMessage("Device status refreshed.");
+         setTimeout(() => setActionMessage(null), 2000);
     };
-    // --- End Refresh Status Handler ---
 
     const openEditForm = (device) => {
         clearActionFeedback();
@@ -344,202 +333,217 @@ function DeviceList() {
     const handleCancelForm = () => {
         setShowForm(false);
         setEditingDevice(null);
-        clearActionFeedback();
     };
 
-    // Helper function to get credential name from ID
     const getCredentialName = (id) => {
         const cred = credentials.find(c => c.id === id);
-        return cred ? cred.name : 'Unknown';
+        return cred ? cred.name : 'N/A';
     };
 
-    // Filter credentials to find those not associated with ANY device
-    const availableCredentials = credentials.filter(cred => !cred.device_id);
+    const renderVerificationStatus = (credId) => {
+        const status = verificationStatus[credId];
+        if (!status) return null;
 
-    if (loading && !devices.length) return <p>Loading devices and credentials...</p>; // Show loading only initially
-    // Show primary error prominently if loading failed
-    if (error && !devices.length) return <Alert variant="danger">Error loading data: {error}</Alert>; 
+        if (status.status === 'loading') {
+            return <Spinner animation="border" size="sm" className="ms-2" />;
+        } else if (status.status === 'success') {
+            return <Badge bg="success" className="ms-2" title={status.message}><CheckCircle /> Success</Badge>;
+        } else if (status.status === 'error') {
+            return <Badge bg="danger" className="ms-2" title={status.message}><XCircle /> Failed</Badge>;
+        }
+        return null;
+    };
+
+    const renderLogConfigStatus = (deviceId) => {
+        const status = logConfigStatus[deviceId];
+        if (!status) return <Spinner animation="border" size="sm" />;
+        if (status.loading) return <Spinner animation="border" size="sm" />;
+        if (status.error) return <Badge bg="warning" text="dark" title={status.error}>Error</Badge>;
+
+        return (
+            <>
+                {status.enabled ? (
+                    <Badge bg="success" title={`Target: ${status.target || 'N/A'}`}>Enabled</Badge>
+                ) : (
+                    <Badge bg="secondary">Disabled</Badge>
+                )}
+                <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    className="ms-2"
+                    onClick={() => handleToggleLogConfig(deviceId, status.enabled)}
+                    disabled={status.loading || !!status.error}
+                    title={status.enabled ? 'Disable Remote Logging' : 'Enable Remote Logging'}
+                >
+                    {status.enabled ? <CloudSlashFill /> : <CloudArrowUpFill />}
+                </Button>
+            </>
+        );
+    };
+
+    if (loading && devices.length === 0) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
+                <Spinner animation="border" role="status">
+                    <span className="visually-hidden">Loading Devices...</span>
+                </Spinner>
+            </div>
+        );
+    }
+
+    if (error && devices.length === 0) {
+        return <Alert variant="danger">Error loading devices: {error}</Alert>;
+    }
 
     return (
-        <div>
-            <h2>Devices</h2>
-            {/* Action feedback Alerts */} 
-            {actionError && <Alert variant="danger" onClose={() => setActionError(null)} dismissible>{actionError}</Alert>}
-            {actionMessage && <Alert variant="success" onClose={() => setActionMessage(null)} dismissible>{actionMessage}</Alert>}
-
-            {!showForm && (
-                 <button onClick={openCreateForm} className="btn btn-primary mb-3"> {/* Added Bootstrap class */} 
+         <Card>
+             <Card.Header className="d-flex justify-content-between align-items-center">
+                 <h4 className="mb-0">Monitored Devices</h4>
+                 <Button variant="primary" onClick={openCreateForm}>
                      Add New Device
-                 </button>
-            )}
+                 </Button>
+             </Card.Header>
+             <Card.Body>
+                 {actionError && <Alert variant="danger" onClose={() => setActionError(null)} dismissible>{actionError}</Alert>}
+                 {actionMessage && <Alert variant="success" onClose={() => setActionMessage(null)} dismissible>{actionMessage}</Alert>}
 
-            {showForm && (
-                <DeviceForm
-                    initialDevice={editingDevice}
-                    onSubmit={editingDevice ? handleUpdate : handleCreate}
-                    onCancel={handleCancelForm}
-                />
-            )}
-             {/* Display loading indicator if fetching updates */}
-             {loading && devices.length > 0 && <p>Refreshing device list...</p>}
+                 {showForm && (
+                     <Card className="mb-4">
+                         <Card.Body>
+                             <DeviceForm
+                                 device={editingDevice}
+                                 onSubmit={editingDevice ? handleUpdate : handleCreate}
+                                 onCancel={handleCancelForm}
+                             />
+                         </Card.Body>
+                     </Card>
+                 )}
 
-            {devices.length === 0 && !loading ? (
-                <p>No devices found.</p>
-            ) : (
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                    {devices.map(device => {
-                        const currentVerification = verificationStatus[device.credential_id];
-                        const currentLogStatus = logConfigStatus[device.id];
-                        const isRebooting = rebootingDevice === device.id;
-                        const isRefreshing = refreshingDevice === device.id;
-                        return (
-                        <li key={device.id} className="list-group-item mb-3 p-3"> {/* Bootstrap list styling */} 
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-                                <h5 className="mb-0">{device.name} ({device.ip_address})</h5>
-                                <div className="d-flex align-items-center">
-                                    {/* Refresh Button */} 
-                                     <Button 
-                                         variant="link" 
-                                         size="sm" 
-                                         className="p-0 me-2" 
-                                         onClick={() => handleRefreshStatus(device.id)}
-                                         disabled={!device.credential_id || isRefreshing || isRebooting}
-                                         title={!device.credential_id ? "Associate a credential to refresh status" : "Refresh Status"}
-                                     >
-                                         {isRefreshing 
-                                             ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
-                                             : <i className="bi bi-arrow-clockwise"></i> /* Using Bootstrap Icons */
-                                         }
-                                     </Button>
-                                    {/* Status Badge */}
-                                    <span 
-                                        className={`badge bg-${device.status === 'Online' || device.status === 'Verified' ? 'success' : (device.status === 'Unknown' || device.status === 'Rebooting' ? 'secondary' : 'danger')}`}
-                                        title={`Status: ${device.status}`}
-                                    >
-                                        {device.status}
-                                    </span>
-                                </div>
-                                <span className={`badge bg-${device.status === 'Online' || device.status === 'Verified' ? 'success' : 'secondary'}`}>{device.status}</span>
-                            </div>
-                            <p className="mb-1">{device.description || 'No description'}</p>
-                            <small className="text-muted">Last Seen: {device.last_seen ? new Date(device.last_seen).toLocaleString() : 'Never'}</small>
-                            
-                            {/* --- Credential Association UI --- */}
-                            <div className="mt-3 pt-3 border-top">
-                                <h6>SSH Credential</h6>
-                                {device.credential_id ? (
-                                    <div className="d-flex align-items-center flex-wrap">
-                                        <span>{getCredentialName(device.credential_id)}</span>
-                                        <button
-                                            onClick={() => handleVerify(device.credential_id)}
-                                            className="btn btn-sm btn-outline-info ms-2" 
-                                            disabled={currentVerification?.status === 'loading'}
-                                        >
-                                            {currentVerification?.status === 'loading' ? 'Verifying...' : 'Verify'}
-                                        </button>
-                                        <button
-                                            onClick={() => handleDisassociate(device.id, getCredentialName(device.credential_id))}
-                                            className="btn btn-sm btn-outline-warning ms-2"
-                                        >
-                                            Disassociate
-                                        </button>
-                                        {currentVerification && (
-                                            <span className={`ms-2 badge bg-${currentVerification.status === 'success' ? 'success' : (currentVerification.status === 'error' ? 'danger' : 'secondary')}`}>
-                                                {currentVerification.message}
-                                            </span>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="input-group input-group-sm">
-                                        <select
-                                            className="form-select"
-                                            value={selectedCredential[device.id] || ''}
-                                            onChange={(e) => handleCredentialSelectChange(device.id, e)}
-                                        >
-                                            <option value="" disabled>Select Credential...</option>
-                                            {availableCredentials.map(cred => (
-                                                <option key={cred.id} value={cred.id}>
-                                                    {cred.name} ({cred.ssh_username})
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <button
-                                             className="btn btn-outline-primary"
-                                             onClick={() => handleAssociate(device.id)}
-                                             disabled={!selectedCredential[device.id]}
-                                        >
-                                             Associate
-                                         </button>
-                                         {availableCredentials.length === 0 && <span className="ms-2 text-muted">(No available credentials)</span>}
-                                    </div>
-                                )}
-                            </div>
+                 {loading && devices.length > 0 && <Spinner animation="border" size="sm" className="me-2" />}
+                 {error && <Alert variant="warning">Could not refresh device list: {error}</Alert>}
 
-                            {/* --- Remote Logging Control UI --- */} 
-                             <div className="mt-3 pt-3 border-top">
-                                <h6>Remote Logging (to this server)</h6>
-                                {!device.credential_id ? (
-                                    <small className="text-muted">Associate credential to manage logging.</small>
-                                ) : currentLogStatus?.loading ? (
-                                     <Spinner animation="border" size="sm" />
-                                ) : currentLogStatus?.error ? (
-                                    <><span className="text-danger">Error: {currentLogStatus.error}</span> <Button variant="link" size="sm" onClick={() => fetchLogConfig(device.id)}>Retry</Button></>
-                                ) : currentLogStatus ? (
-                                    <div>
-                                        Status: <span className={`fw-bold ${currentLogStatus.enabled ? 'text-success' : 'text-secondary'}`}>{currentLogStatus.enabled ? 'Enabled' : 'Disabled'}</span>
-                                        {currentLogStatus.enabled && <small className="text-muted ms-2">(Target: {currentLogStatus.target || 'N/A'})</small>}
-                                        <Button 
-                                            variant={currentLogStatus.enabled ? "outline-danger" : "outline-success"} 
-                                            size="sm" 
-                                            className="ms-3"
-                                            onClick={() => handleToggleLogConfig(device.id, currentLogStatus.enabled)}
-                                        >
-                                            {currentLogStatus.enabled ? 'Disable Remote Logging' : 'Enable Remote Logging'}
-                                        </Button>
-                                    </div>
-                                ) : (
-                                     <Button variant="link" size="sm" onClick={() => fetchLogConfig(device.id)}>Check Status</Button>
-                                )}
-                            </div>
-                            {/* --- End Remote Logging Control UI --- */} 
+                 <Table striped bordered hover responsive className="mt-3 align-middle">
+                     <thead>
+                         <tr>
+                             <th>Name</th>
+                             <th>Hostname / IP</th>
+                             <th>Status</th>
+                             <th>Remote Logging</th>
+                             <th>Credential</th>
+                             <th>Actions</th>
+                         </tr>
+                     </thead>
+                     <tbody>
+                         {devices.length === 0 && !loading ? (
+                            <tr>
+                                <td colSpan="6" className="text-center">No devices configured yet.</td>
+                            </tr>
+                         ) : (
+                             devices.map(device => (
+                                 <tr key={device.id}>
+                                     <td>{device.name}</td>
+                                     <td>{device.host}</td>
+                                     <td>
+                                         {refreshingDevice === device.id ? (
+                                              <Spinner animation="border" size="sm" />
+                                         ) : (
+                                             <Badge bg={device.credential_id ? "success" : "secondary"}>
+                                                  {device.credential_id ? "Managed" : "Unmanaged"}
+                                             </Badge>
+                                         )}
+                                         <Button
+                                             variant="link"
+                                             size="sm"
+                                             onClick={() => handleRefreshStatus(device.id)}
+                                             disabled={refreshingDevice === device.id}
+                                             title="Refresh Status"
+                                             className="p-0 ms-1 align-baseline"
+                                          >
+                                              <ArrowRepeat />
+                                          </Button>
+                                     </td>
+                                     <td>{renderLogConfigStatus(device.id)}</td>
+                                     <td>
+                                         {device.credential_id ? (
+                                             <div className="d-flex align-items-center">
+                                                 <span>{getCredentialName(device.credential_id)}</span>
+                                                 <Button variant="link" size="sm" onClick={() => handleVerify(device.credential_id)} className="p-0 ms-1" title="Verify SSH Connection">
+                                                     <Key />
+                                                 </Button>
+                                                 {renderVerificationStatus(device.credential_id)}
+                                                 <Button variant="outline-danger" size="sm" className="ms-2" onClick={() => handleDisassociate(device.id, getCredentialName(device.credential_id))} title="Disassociate Credential">
+                                                     <XCircle />
+                                                 </Button>
+                                             </div>
+                                         ) : (
+                                             <div className="d-flex align-items-center">
+                                                 <Form.Select
+                                                     size="sm"
+                                                     value={selectedCredential[device.id] || ''}
+                                                     onChange={(e) => handleCredentialSelectChange(device.id, e)}
+                                                     className="me-2"
+                                                     style={{ maxWidth: '150px' }}
+                                                 >
+                                                     <option value="">Select Credential...</option>
+                                                     {credentials.map(cred => (
+                                                         <option key={cred.id} value={cred.id}>{cred.name}</option>
+                                                     ))}
+                                                 </Form.Select>
+                                                 <Button
+                                                      variant="outline-primary"
+                                                      size="sm"
+                                                      onClick={() => handleAssociate(device.id)}
+                                                      disabled={!selectedCredential[device.id]}
+                                                  >
+                                                      Associate
+                                                  </Button>
+                                             </div>
+                                         )}
+                                     </td>
+                                     <td>
+                                         <ButtonGroup size="sm">
+                                             <Button variant="outline-secondary" onClick={() => openEditForm(device)} title="Edit Device">
+                                                 <PencilSquare />
+                                             </Button>
+                                             <Button
+                                                  variant="outline-info"
+                                                  onClick={() => openUciModal(device)}
+                                                  disabled={!device.credential_id || logConfigStatus[device.id]?.loading || refreshingDevice === device.id}
+                                                  title="Apply UCI Config"
+                                              >
+                                                 <GearFill />
+                                             </Button>
+                                             <Button
+                                                 variant="outline-warning"
+                                                 onClick={() => handleReboot(device)}
+                                                  disabled={!device.credential_id || rebootingDevice === device.id || logConfigStatus[device.id]?.loading || refreshingDevice === device.id}
+                                                  title="Reboot Device"
+                                              >
+                                                 {rebootingDevice === device.id ? <Spinner as="span" animation="border" size="sm" /> : <Power />}
+                                             </Button>
+                                             <Button variant="outline-danger" onClick={() => handleDelete(device)} title="Delete Device">
+                                                 <Trash />
+                                             </Button>
+                                         </ButtonGroup>
+                                     </td>
+                                 </tr>
+                             ))
+                         )}
+                     </tbody>
+                 </Table>
 
-                            {/* Action Buttons */}
-                            <div className="mt-3 pt-3 border-top d-flex flex-wrap gap-2"> {/* Use flexbox and gap */} 
-                                 <Button onClick={() => openEditForm(device)} size="sm" variant="secondary" disabled={isRebooting}>Edit Device</Button>
-                                 <Button
-                                     onClick={() => openUciModal(device)}
-                                     size="sm"
-                                     variant="info"
-                                     disabled={!device.credential_id || isRebooting}
-                                     title={!device.credential_id ? "Associate a credential first" : "Apply UCI Commands"}
-                                 >
-                                     Apply UCI
-                                 </Button>
-                                 <Button 
-                                     onClick={() => handleReboot(device)}
-                                     size="sm"
-                                     variant="warning"
-                                     disabled={!device.credential_id || isRebooting}
-                                     title={!device.credential_id ? "Associate a credential first" : "Reboot Device"}
-                                 >
-                                     {isRebooting ? <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> Rebooting...</> : 'Reboot Device'}
-                                 </Button>
-                                  <Button onClick={() => handleDelete(device)} size="sm" variant="danger" disabled={isRebooting}>Delete Device</Button>
-                            </div>
-                        </li>
-                    )})}
-                </ul>
-            )}
+                 {uciTargetDevice && showUciModal && (
+                    <ApplyUciModal
+                        show={showUciModal}
+                        handleClose={handleCancelUciModal}
+                        handleApply={handleApplyUci}
+                        deviceName={uciTargetDevice.name}
+                        deviceHost={uciTargetDevice.host}
+                    />
+                 )}
 
-            {/* Render UCI Modal */} 
-            {showUciModal && uciTargetDevice && (
-                <ApplyUciModal
-                    device={uciTargetDevice}
-                    onSubmit={handleApplyUci}
-                    onCancel={handleCancelUciModal}
-                />
-            )}
-        </div>
+             </Card.Body>
+         </Card>
     );
 }
 

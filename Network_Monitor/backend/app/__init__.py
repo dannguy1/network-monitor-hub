@@ -6,6 +6,8 @@ from flask_apscheduler import APScheduler
 from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_cors import CORS
+from cryptography.fernet import Fernet
 from .config import config
 
 db = SQLAlchemy()
@@ -17,6 +19,22 @@ limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"]
 )
+
+# --- Encryption Setup ---
+def get_encryption_key():
+    key = os.environ.get('ENCRYPTION_KEY')
+    if not key:
+        raise ValueError("ENCRYPTION_KEY environment variable not set!")
+    return key.encode()
+
+def get_cipher_suite():
+    try:
+        return Fernet(get_encryption_key())
+    except Exception as e:
+        # Provide more context if the key is invalid
+        print(f"Error initializing Fernet. Ensure ENCRYPTION_KEY is a valid Fernet key. Error: {e}")
+        raise ValueError("Invalid ENCRYPTION_KEY provided.") from e
+# --- End Encryption Setup ---
 
 def create_app(config_name=None):
     if config_name is None:
@@ -45,11 +63,20 @@ def create_app(config_name=None):
     else:
         print("Scheduler already running.")
 
+    # Setup CORS properly
+    # Allow requests from the frontend origin (adjust in production)
+    frontend_origin = app.config.get('FRONTEND_ORIGIN', 'http://localhost:3000')
+    CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": frontend_origin}})
+
     # Register blueprints
     from .api import api as api_blueprint
     app.register_blueprint(api_blueprint, url_prefix='/api/v1')
     from .auth import auth as auth_blueprint
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
+
+    # Import and register the new dashboard blueprint
+    from .api.dashboard import bp as dashboard_bp
+    app.register_blueprint(dashboard_bp, url_prefix='/api/v1/dashboard')
 
     # Register CLI commands (important for background tasks management)
     from . import cli

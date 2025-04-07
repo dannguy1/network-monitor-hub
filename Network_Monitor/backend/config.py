@@ -53,7 +53,13 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    TESTING = False # Explicitly set TESTING to False for production
     # Add production specific settings like logging configurations
+    # For example, configuring logging to a file:
+    # import logging
+    # from logging.handlers import RotatingFileHandler
+    # LOG_FILE = os.environ.get('PROD_LOG_FILE') or '/var/log/network-monitor/app.log'
+    # LOG_LEVEL = logging.INFO
 
 # Add Testing Config
 class TestingConfig(Config):

@@ -1,105 +1,104 @@
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
-// Base URL for the backend API
-// In development, React's proxy will handle redirecting this
-// In production, Nginx or similar should route /api/v1 to the backend
-const API_BASE_URL = '/api/v1';
+// Get the base URL from environment variables or default
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api/v1'; // Default to relative path for proxy
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
+    withCredentials: true, // Send cookies with requests
     headers: {
-        'Content-Type': 'application/json',
-    },
+        'Content-Type': 'application/json'
+    }
 });
 
-// Add a response interceptor to handle 401 errors globally
+// Add a request interceptor to include the CSRF token if available
+apiClient.interceptors.request.use(config => {
+    const csrfToken = Cookies.get('csrf_access_token'); // Default cookie name for Flask-Login CSRF
+    if (csrfToken) {
+        config.headers['X-CSRF-TOKEN'] = csrfToken;
+    }
+    return config;
+});
+
+// Handle unauthorized errors globally (e.g., redirect to login)
 apiClient.interceptors.response.use(
-    response => response, // Pass through successful responses
+    response => response,
     error => {
         if (error.response && error.response.status === 401) {
-            // Check if it's not the /auth/status or /auth/login endpoints that failed
-            if (!error.config.url.includes('/auth/status') && !error.config.url.includes('/auth/login')) {
-                console.warn('Unauthorized (401). Redirecting to login or clearing session.');
-                // Option 1: Redirect to login (might cause issues if App component isn't ready)
-                // window.location.href = '/login'; // Or your login route
-                
-                // Option 2: Emit an event or use context to notify App component to clear user state
-                // This is generally safer within React.
-                // For simplicity here, we'll just log it. App component's check on load handles initial state.
-                // A more robust solution involves React Context for auth state management.
+            // Clear potentially stale auth state (implementation depends on your AuthContext)
+            // For example: authContext.logout();
+            // Redirect to login page
+            if (window.location.pathname !== '/login') { // Avoid redirect loop
+                 window.location.href = '/login'; // Simple redirect
             }
         }
-        // Important: Reject the promise so individual calls can still catch errors
         return Promise.reject(error);
     }
 );
 
-// --- Device Endpoints --- 
-export const getDevices = () => apiClient.get('/devices');
-export const getDevice = (id) => apiClient.get(`/devices/${id}`);
-export const createDevice = (deviceData) => apiClient.post('/devices', deviceData);
-export const updateDevice = (id, deviceData) => apiClient.put(`/devices/${id}`, deviceData);
-export const deleteDevice = (id) => apiClient.delete(`/devices/${id}`);
-export const applyDeviceConfig = (id, configData) => apiClient.post(`/devices/${id}/apply_config`, { config_data: configData });
+// --- Authentication --- //
+const login = (username, password) => apiClient.post('/auth/login', { username, password });
+const logout = () => apiClient.post('/auth/logout');
+const checkAuth = () => apiClient.get('/auth/check'); // Endpoint to verify session
+const createUser = (username, password) => apiClient.post('/auth/create-user', { username, password }); // Admin only usually
 
-// --- Credential Endpoints --- 
-export const getCredentials = () => apiClient.get('/credentials');
-export const getCredential = (id) => apiClient.get(`/credentials/${id}`);
-export const createCredential = (credentialData) => apiClient.post('/credentials', credentialData);
-export const updateCredential = (id, credentialData) => apiClient.put(`/credentials/${id}`, credentialData);
-export const deleteCredential = (id) => apiClient.delete(`/credentials/${id}`);
-export const associateCredential = (deviceId, credentialId) => apiClient.post(`/devices/${deviceId}/credential/${credentialId}`);
-export const disassociateCredential = (deviceId) => apiClient.delete(`/devices/${deviceId}/credential`);
-export const verifyCredential = (id) => apiClient.post(`/credentials/${id}/verify`);
+// --- Devices --- //
+const getDevices = () => apiClient.get('/devices');
+const getDevice = (id) => apiClient.get(`/devices/${id}`);
+const createDevice = (data) => apiClient.post('/devices', data);
+const updateDevice = (id, data) => apiClient.put(`/devices/${id}`, data);
+const deleteDevice = (id) => apiClient.delete(`/devices/${id}`);
+const associateCredential = (deviceId, credentialId) => apiClient.post(`/devices/${deviceId}/associate`, { credential_id: credentialId });
+const disassociateCredential = (deviceId) => apiClient.post(`/devices/${deviceId}/disassociate`);
+const rebootDevice = (deviceId) => apiClient.post(`/devices/${deviceId}/reboot`); // New
+const refreshDeviceStatus = (deviceId) => apiClient.get(`/devices/${deviceId}/status`); // New
+const getLogConfig = (deviceId) => apiClient.get(`/devices/${deviceId}/log-config`);
+const toggleLogConfig = (deviceId, enable) => apiClient.post(`/devices/${deviceId}/log-config`, { enable });
 
-// --- Log Endpoints --- 
-// params is an object like { page: 1, per_page: 50, device_id: 1, ... }
-export const getLogs = (params) => apiClient.get('/logs', { params });
-export const getLogEntry = (id) => apiClient.get(`/logs/${id}`);
+// --- Credentials --- //
+const getCredentials = () => apiClient.get('/credentials');
+const getCredential = (id) => apiClient.get(`/credentials/${id}`);
+const createCredential = (data) => apiClient.post('/credentials', data);
+const updateCredential = (id, data) => apiClient.put(`/credentials/${id}`, data);
+const deleteCredential = (id) => apiClient.delete(`/credentials/${id}`);
+const verifyCredential = (id) => apiClient.post(`/credentials/${id}/verify`);
 
-// --- UCI Endpoints --- 
-export const generateUci = (generationData) => apiClient.post('/uci/generate');
+// --- Logs --- //
+const getLogs = (params) => apiClient.get('/logs', { params });
 
-// --- Auth Endpoints --- 
-export const login = (credentials) => apiClient.post('/auth/login', credentials);
-export const logout = () => apiClient.post('/auth/logout');
-export const getAuthStatus = () => apiClient.get('/auth/status');
+// --- UCI --- //
+const applyUciToDevice = (deviceId, commands) => apiClient.post(`/uci/devices/${deviceId}/apply`, { commands });
 
-// --- Log Config Endpoints ---
-export const getLogConfig = (deviceId) => apiClient.get(`/devices/${deviceId}/log_config`);
-export const setLogConfig = (deviceId, enable) => apiClient.post(`/devices/${deviceId}/log_config`, { enable });
+// --- Dashboard --- //
+const getDashboardSummary = () => apiClient.get('/dashboard/summary'); // New
 
-// --- Reboot Endpoint ---
-export const rebootDevice = (deviceId) => apiClient.post(`/devices/${deviceId}/reboot`);
 
-// --- Refresh Status Endpoint ---
-export const refreshDeviceStatus = (deviceId) => apiClient.post(`/devices/${deviceId}/refresh_status`);
-
-// Add other endpoints as needed
-
-export default {
+const api = {
+    login,
+    logout,
+    checkAuth,
+    createUser,
     getDevices,
     getDevice,
     createDevice,
     updateDevice,
     deleteDevice,
-    applyDeviceConfig,
+    associateCredential,
+    disassociateCredential,
+    rebootDevice,
+    refreshDeviceStatus,
+    getLogConfig,
+    toggleLogConfig,
     getCredentials,
     getCredential,
     createCredential,
     updateCredential,
     deleteCredential,
-    associateCredential,
-    disassociateCredential,
     verifyCredential,
     getLogs,
-    getLogEntry,
-    generateUci,
-    login,
-    logout,
-    getAuthStatus,
-    getLogConfig,
-    setLogConfig,
-    rebootDevice,
-    refreshDeviceStatus,
-}; 
+    applyUciToDevice,
+    getDashboardSummary // Export new function
+};
+
+export default api; 
