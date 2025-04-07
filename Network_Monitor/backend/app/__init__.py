@@ -8,7 +8,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from cryptography.fernet import Fernet
-from .config import config
+from ..config import config
 
 db = SQLAlchemy()
 migrate = Migrate()

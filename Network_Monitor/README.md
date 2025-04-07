@@ -93,16 +93,28 @@ Network_Monitor/
     *   Configure `DATABASE_URL` if not using the default SQLite path (`backend/data/app.db`).
     *   Configure `AI_ENGINE_ENDPOINT`, `AI_ENGINE_API_KEY`, and `AI_PUSH_INTERVAL_MINUTES` if using the AI push feature.
 7.  **Database Initialization:**
-    *   Ensure the virtual environment is active.
-    *   Set Flask environment variables:
-        *   macOS/Linux: `export FLASK_APP=wsgi.py && export FLASK_CONFIG=development`
-        *   Windows: `set FLASK_APP=wsgi.py && set FLASK_CONFIG=development` (or use `.flaskenv` file)
+    *   Ensure the virtual environment is active (`source backend/venv/bin/activate`).
+    *   **Navigate to the `backend` directory:** `cd backend`
+    *   Set Flask environment variables **for the `backend` directory**:
+        *   macOS/Linux: `export FLASK_APP=app:create_app && export FLASK_CONFIG=development`
+        *   Windows (Git Bash/WSL): `export FLASK_APP=app:create_app && export FLASK_CONFIG=development`
+        *   Windows (CMD): `set FLASK_APP=app:create_app && set FLASK_CONFIG=development`
+        *   Windows (PowerShell): `$env:FLASK_APP="app:create_app"; $env:FLASK_CONFIG="development"`
+        *(Note: Using `app:create_app` assumes you are running `flask` commands from within the `backend` directory.)*
     *   Initialize migrations (only once per project): `flask db init`
     *   Create migration script: `flask db migrate -m "Initial models"`
     *   Apply migrations to create database: `flask db upgrade`
-8.  **Run Development Server:** `flask run`
+    *   **Return to project root:** `cd ..`
+8.  **Run Development Server:**
+    *   Ensure virtualenv is active (`source backend/venv/bin/activate`).
+    *   **Navigate to the `backend` directory:** `cd backend`
+    *   Set Flask environment variables (if not already set in your session):
+        *   macOS/Linux: `export FLASK_APP=app:create_app && export FLASK_CONFIG=development`
+        *   Windows: (Use appropriate command from step 7)
+    *   Run: `flask run`
     *   The backend API will be available at `http://localhost:5000`.
     *   The AI Pusher scheduler will start automatically.
+    *   **Return to project root:** `cd ..`
 
 ### Frontend
 
