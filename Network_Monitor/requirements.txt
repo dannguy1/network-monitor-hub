@@ -1,0 +1,16 @@
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+# psycopg2-binary # Or mysqlclient if using MySQL - Removed for SQLite
+python-dotenv
+gunicorn
+cryptography
+paramiko
+requests
+Flask-APScheduler
+python-dateutil
+pytest
+pytest-flask
+Flask-Login
+Werkzeug
+Flask-Limiter 

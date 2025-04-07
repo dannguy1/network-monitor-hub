@@ -1,0 +1,23 @@
+.gitignore content:
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.flaskenv
+instance/
+*.sqlite3
+data/
+!data/.gitkeep
+
+# Frontend
+Network_Monitor/frontend/node_modules/
+Network_Monitor/frontend/build/
+Network_Monitor/frontend/.pnp
+Network_Monitor/frontend/.pnp.js
+Network_Monitor/frontend/coverage/
+Network_Monitor/frontend/.DS_Store
+Network_Monitor/frontend/npm-debug.log*
+Network_Monitor/frontend/yarn-debug.log*
+Network_Monitor/frontend/yarn-error.log* 
