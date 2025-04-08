@@ -7,10 +7,9 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
         name: '',
         ip_address: '',
         description: '',
-        // Credential fields - initialize empty
-        credential_name: '',
+        // Credential fields
         credential_ssh_username: '',
-        credential_auth_type: 'password', // Default auth type
+        credential_auth_type: 'password', 
         credential_password: '',
         credential_private_key: ''
     });
@@ -22,8 +21,6 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
                 name: initialDevice.name || '',
                 ip_address: initialDevice.ip_address || '',
                 description: initialDevice.description || '',
-                // Don't populate credential fields when editing - assume they can't be changed here
-                credential_name: '', 
                 credential_ssh_username: '',
                 credential_auth_type: 'password',
                 credential_password: '',
@@ -33,7 +30,7 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
             // Reset form for creation
             setFormData({
                 name: '', ip_address: '', description: '',
-                credential_name: '', credential_ssh_username: '', credential_auth_type: 'password',
+                credential_ssh_username: '', credential_auth_type: 'password',
                 credential_password: '', credential_private_key: ''
             });
         }
@@ -57,8 +54,8 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
 
         // Credential validation only when CREATING
         if (!isEditing) {
-            if (!formData.credential_name || !formData.credential_ssh_username || !formData.credential_auth_type) {
-                setValidationError('Credential Name, SSH Username, and Auth Type are required when creating a device.');
+            if (!formData.credential_ssh_username || !formData.credential_auth_type) {
+                setValidationError('SSH Username and Auth Type are required when creating a device.');
                 return;
             }
             if (formData.credential_auth_type === 'password' && !formData.credential_password) {
@@ -79,7 +76,6 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
         };
         if (!isEditing) {
              Object.assign(dataToSend, {
-                credential_name: formData.credential_name,
                 credential_ssh_username: formData.credential_ssh_username,
                 credential_auth_type: formData.credential_auth_type,
                 credential_password: formData.credential_password,
@@ -132,17 +128,6 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
                     <hr />
                     <h4>Device Credentials (Required)</h4>
                      <Row className="mb-3">
-                        <Form.Group as={Col} controlId="formCredName">
-                            <Form.Label>Credential Name*</Form.Label>
-                            <Form.Control
-                                type="text"
-                                name="credential_name"
-                                value={formData.credential_name}
-                                onChange={handleChange}
-                                required
-                                placeholder="e.g., MyRouter-Creds"
-                            />
-                        </Form.Group>
                         <Form.Group as={Col} controlId="formCredSshUser">
                             <Form.Label>SSH Username*</Form.Label>
                             <Form.Control

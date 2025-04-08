@@ -286,11 +286,6 @@ function DeviceList() {
         setEditingDevice(null);
     };
 
-    const getCredentialName = (id) => {
-        const cred = devices.find(d => d.credential_id === id);
-        return cred ? cred.credential.name : 'N/A';
-    };
-
     const renderVerificationStatus = (credId) => {
         const status = verificationStatus[credId];
         if (!status) return null;
@@ -410,7 +405,7 @@ function DeviceList() {
                              devices.map(device => (
                                  <tr key={device.id}>
                                      <td>{device.name}</td>
-                                     <td>{device.host}</td>
+                                     <td>{device.ip_address}</td>
                                      <td>
                                          {refreshingDevice === device.id ? (
                                               <Spinner animation="border" size="sm" />
@@ -432,9 +427,10 @@ function DeviceList() {
                                      </td>
                                      <td>{renderLogConfigStatus(device.id)}</td>
                                      <td>
-                                         {device.credential_id ? (
+                                         {device.credential ? (
                                              <div className="d-flex align-items-center">
-                                                 <span>{getCredentialName(device.credential_id)}</span>
+                                                 <Key size={14} className="me-1"/>
+                                                 <span>{device.credential?.ssh_username ?? 'Unknown User'}</span>
                                                  <Button variant="link" size="sm" onClick={() => handleVerify(device.id)} className="p-0 ms-1" title="Verify SSH Connection">
                                                      <Key />
                                                  </Button>
@@ -482,7 +478,7 @@ function DeviceList() {
                         handleClose={handleCancelUciModal}
                         handleApply={handleApplyUci}
                         deviceName={uciTargetDevice.name}
-                        deviceHost={uciTargetDevice.host}
+                        deviceHost={uciTargetDevice.ip_address}
                     />
                  )}
 

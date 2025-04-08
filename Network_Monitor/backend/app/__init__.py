@@ -18,8 +18,8 @@ login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 limiter = Limiter(
     key_func=get_remote_address,
-    # Temporarily increase limits for debugging
-    default_limits=["1000 per day", "200 per hour", "50 per minute"]
+    # Set limits extremely high to avoid issues during testing
+    default_limits=["10000 per day", "2000 per hour", "500 per minute"]
 )
 
 # --- Encryption Setup ---

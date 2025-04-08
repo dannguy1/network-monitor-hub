@@ -7,7 +7,7 @@ import datetime
 class Credential(db.Model):
     __tablename__ = 'credentials'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(128), nullable=False, unique=True, index=True) # User-friendly name for the credential set
+    # name = db.Column(db.String(128), nullable=False, unique=True, index=True) # REMOVED
     ssh_username = db.Column(db.String(128), nullable=False)
     # Store encrypted password and private key
     encrypted_password = db.Column(db.LargeBinary, nullable=True)
@@ -72,13 +72,13 @@ class Credential(db.Model):
             self.encrypted_private_key = None
 
     def __repr__(self):
-        return f'<Credential {self.name} (User: {self.ssh_username}, Type: {self.auth_type})>'
+        return f'<Credential ID: {self.id} (User: {self.ssh_username}, Type: {self.auth_type})>'
 
     # Exclude sensitive decrypted fields from default dict representation
     def to_dict(self):
         return {
             'id': self.id,
-            'name': self.name,
+            # 'name': self.name, # REMOVED
             'ssh_username': self.ssh_username,
             'auth_type': self.auth_type,
             'has_password': self.encrypted_password is not None,

@@ -22,15 +22,14 @@ def create_device():
     control_method = data.get('control_method', 'ssh')
 
     # --- Credential Fields (Required) --- #
-    cred_name = data.get('credential_name')
     cred_ssh_username = data.get('credential_ssh_username')
     cred_auth_type = data.get('credential_auth_type') # 'password' or 'key'
     cred_password = data.get('credential_password')
     cred_private_key = data.get('credential_private_key')
 
-    # --- Validation (All fields now required) --- #
+    # --- Validation (All fields now required, except cred_name) --- #
     required_device_fields = {'name': name, 'ip_address': ip_address}
-    required_cred_fields = {'credential_name': cred_name, 'credential_ssh_username': cred_ssh_username, 'credential_auth_type': cred_auth_type}
+    required_cred_fields = {'credential_ssh_username': cred_ssh_username, 'credential_auth_type': cred_auth_type}
     
     missing_fields = [k for k, v in required_device_fields.items() if not v]
     missing_fields.extend([k for k, v in required_cred_fields.items() if not v])
@@ -50,8 +49,6 @@ def create_device():
          return jsonify({"error": f"Device with name '{name}' already exists"}), 409
     if Device.query.filter_by(ip_address=ip_address).first():
          return jsonify({"error": f"Device with IP address '{ip_address}' already exists"}), 409
-    if Credential.query.filter_by(name=cred_name).first():
-         return jsonify({"error": f"Credential with name '{cred_name}' already exists"}), 409
 
     # --- Create Objects (within transaction) --- #
     device = Device(
@@ -61,7 +58,6 @@ def create_device():
         control_method=control_method
     )
     credential = Credential(
-        name=cred_name,
         ssh_username=cred_ssh_username,
         auth_type=cred_auth_type
     )
@@ -70,12 +66,9 @@ def create_device():
     else:
         credential.private_key = cred_private_key
     
-    # Associate directly
-    device.credential = credential # This sets device.credential_id automatically on commit
+    device.credential = credential 
 
     try:
-        # Add credential first due to potential FK constraint if device depended on it
-        # (though here device.credential handles the link)
         db.session.add(credential) 
         db.session.add(device)    
         db.session.commit()
@@ -88,7 +81,7 @@ def create_device():
         current_app.logger.error(f"Error creating device {name}: {e}", exc_info=True)
         return jsonify({"error": "Failed to create device", "message": str(e)}), 500
 
-    response = jsonify(device.to_dict()) # to_dict should include credential info
+    response = jsonify(device.to_dict())
     response.status_code = 201
     response.headers['Location'] = url_for('api.get_device', id=device.id)
     return response
