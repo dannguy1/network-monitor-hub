@@ -9,6 +9,7 @@ from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from cryptography.fernet import Fernet
 from ..config import config
+from dotenv import load_dotenv
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -64,6 +65,13 @@ def create_app(config_name=None):
         print("Scheduler already running.")
 
     # Setup CORS properly
+    # --- Add explicit dotenv load here for debugging --- #
+    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) # Should be /backend
+    dotenv_path = os.path.join(basedir, '..', '.env') # Go up one more level to Network_Monitor/.env
+    load_dotenv(dotenv_path, override=True) # Override existing env vars if needed
+    print(f"DEBUG: Explicitly loaded .env from: {dotenv_path}")
+    # --- End explicit load --- #
+
     # Allow requests from the frontend origin (adjust in production)
     frontend_origin = app.config.get('FRONTEND_ORIGIN', 'http://localhost:3000')
     print(f"DEBUG: Configuring CORS for origin: {frontend_origin}")
