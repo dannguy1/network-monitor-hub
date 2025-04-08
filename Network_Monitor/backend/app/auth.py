@@ -16,14 +16,11 @@ def load_user(user_id):
 @limiter.limit("5 per minute")
 def login():
     data = request.get_json()
-    print(f"DEBUG: Login request data: {data}")
     username = data.get('username')
     password = data.get('password')
-    print(f"DEBUG: Login username: {username}, Password provided: {bool(password)}")
     remember = data.get('remember', False)
 
     if not username or not password:
-        print("DEBUG: Failing login due to missing username or password.")
         return jsonify({"error": "Username and password required"}), 400
 
     user = User.query.filter_by(username=username).first()
