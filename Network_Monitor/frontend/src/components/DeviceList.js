@@ -344,9 +344,6 @@ function DeviceList() {
             });
     }, [fetchDevices]);
 
-    // Add console log before return
-    console.log("Rendering DeviceList with devices state:", devices);
-
     if (loading && devices.length === 0) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
@@ -413,8 +410,8 @@ function DeviceList() {
                                          {refreshingDevice === device.id ? (
                                               <Spinner animation="border" size="sm" />
                                          ) : (
-                                             <Badge bg={device.credential_id ? "success" : "secondary"}>
-                                                  {device.credential_id ? "Managed" : "Unmanaged"}
+                                             <Badge bg={device.status === 'Online' ? 'success' : (device.status === 'Offline' ? 'danger' : 'secondary')}>
+                                                  {device.status} 
                                              </Badge>
                                          )}
                                          <Button
