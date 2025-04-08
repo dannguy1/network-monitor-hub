@@ -476,10 +476,9 @@ function DeviceList() {
                  {uciTargetDevice && showUciModal && (
                     <ApplyUciModal
                         show={showUciModal}
-                        handleClose={handleCancelUciModal}
-                        handleApply={handleApplyUci}
-                        deviceName={uciTargetDevice.name}
-                        deviceHost={uciTargetDevice.ip_address}
+                        device={uciTargetDevice}
+                        onSubmit={handleApplyUci}
+                        onCancel={handleCancelUciModal}
                     />
                  )}
 
