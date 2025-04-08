@@ -16,22 +16,31 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
     const [validationError, setValidationError] = useState('');
 
     useEffect(() => {
+        console.log("[DeviceForm] useEffect triggered. Received initialDevice prop:", initialDevice); // Log received prop
         if (initialDevice) {
+            console.log("[DeviceForm] Setting form data for editing:", initialDevice); // Log data being set
             // When editing, only set device-specific fields
-            setFormData(prev => ({ 
-                ...prev, // Keep previous state (incl. default cred fields)
-                name: initialDevice.name || '',
-                ip_address: initialDevice.ip_address || '',
-                description: initialDevice.description || ''
-                // Do NOT reset credential fields here
-            }));
+            setFormData(prev => {
+                const updated = { 
+                    ...prev, // Keep previous state (incl. default cred fields)
+                    name: initialDevice.name || '',
+                    ip_address: initialDevice.ip_address || '',
+                    description: initialDevice.description || ''
+                    // Do NOT reset credential fields here
+                };
+                console.log("[DeviceForm] New formData state (edit):", updated); // Log the new state
+                return updated;
+            });
         } else {
+            console.log("[DeviceForm] Resetting form data for creation."); // Log reset
             // Reset form for creation (keep this block)
-            setFormData({
+            const resetData = {
                 name: '', ip_address: '', description: '',
                 credential_ssh_username: '', credential_auth_type: 'password',
                 credential_password: '', credential_private_key: ''
-            });
+            };
+            setFormData(resetData);
+            console.log("[DeviceForm] New formData state (create):", resetData); // Log the reset state
         }
         setValidationError(''); // Clear errors on form load/reset
     }, [initialDevice]);

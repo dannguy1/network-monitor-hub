@@ -3,7 +3,7 @@ import { Alert, Button, Spinner, Table, Card, Badge, ButtonGroup } from 'react-b
 import api from '../services/api';
 import DeviceForm from './DeviceForm';
 import ApplyUciModal from './ApplyUciModal';
-import { PencilSquare, Trash, Key, CheckCircle, XCircle, ArrowRepeat, GearFill, Power, CloudArrowUpFill, CloudSlashFill } from 'react-bootstrap-icons';
+import { PencilSquare, Trash, Key, CheckCircle, XCircle, ArrowRepeat, GearFill, Power, CloudArrowUpFill, CloudSlashFill, PlusCircleFill } from 'react-bootstrap-icons';
 
 function DeviceList() {
     const [devices, setDevices] = useState([]);
@@ -293,19 +293,20 @@ function DeviceList() {
          setTimeout(() => setActionMessage(null), 2000);
     };
 
-    const openEditForm = (device) => {
-        clearActionFeedback();
-        setEditingDevice(device);
-        setShowForm(true);
-    };
-
-    const openCreateForm = () => {
+    const openAddForm = () => {
         clearActionFeedback();
         setEditingDevice(null);
         setShowForm(true);
     };
 
-    const handleCancelForm = () => {
+    const openEditForm = (device) => {
+        clearActionFeedback();
+        console.log("[DeviceList] Opening edit form for:", device);
+        setEditingDevice(device);
+        setShowForm(true);
+    };
+
+    const closeForm = () => {
         setShowForm(false);
         setEditingDevice(null);
     };
@@ -386,8 +387,8 @@ function DeviceList() {
          <Card>
              <Card.Header className="d-flex justify-content-between align-items-center">
                  <h4 className="mb-0">Monitored Devices</h4>
-                 <Button variant="primary" onClick={openCreateForm}>
-                     Add New Device
+                 <Button variant="primary" onClick={openAddForm}>
+                     <PlusCircleFill className="me-2" /> Add New Device
                  </Button>
              </Card.Header>
              <Card.Body>
@@ -395,15 +396,12 @@ function DeviceList() {
                  {actionMessage && <Alert variant="success" onClose={() => setActionMessage(null)} dismissible>{actionMessage}</Alert>}
 
                  {showForm && (
-                     <Card className="mb-4">
-                         <Card.Body>
-                             <DeviceForm
-                                 device={editingDevice}
-                                 onSubmit={editingDevice ? handleUpdate : handleCreate}
-                                 onCancel={handleCancelForm}
-                             />
-                         </Card.Body>
-                     </Card>
+                     (console.log("[DeviceList] Rendering DeviceForm with initialDevice:", editingDevice),
+                     <DeviceForm 
+                         initialDevice={editingDevice}
+                         onSubmit={editingDevice ? handleUpdate : handleCreate}
+                         onCancel={closeForm}
+                     />)
                  )}
 
                  {loading && devices.length > 0 && <Spinner animation="border" size="sm" className="me-2" />}
