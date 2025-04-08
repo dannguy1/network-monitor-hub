@@ -13,4 +13,5 @@ pytest
 pytest-flask
 Flask-Login
 Werkzeug
-Flask-Limiter 
+Flask-Limiter
+Flask-Cors 
