@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Spinner, Alert } from 'react-bootstrap';
-import { Wifi, WifiOff, FileEarmarkMedicalFill, ExclamationTriangleFill } from 'react-bootstrap-icons'; // Example icons
+import { Wifi, FileEarmarkMedicalFill, ExclamationTriangleFill } from 'react-bootstrap-icons'; // Removed WifiOff
 import api from '../services/api'; // We will need this later
 
 function Dashboard() {

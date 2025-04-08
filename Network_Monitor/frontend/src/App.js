@@ -11,10 +11,9 @@ import './App.css';
 import Dashboard from './components/Dashboard';
 import DeviceList from './components/DeviceList';
 import LogList from './components/LogList';
-import CredentialList from './components/CredentialList';
 import Login from './components/Login';
 import { useAuth } from './context/AuthContext';
-import { Speedometer2, HouseDoorFill, KeyFill, FileEarmarkTextFill } from 'react-bootstrap-icons';
+import { Speedometer2, HouseDoorFill, FileEarmarkTextFill } from 'react-bootstrap-icons';
 
 function App() {
     const { currentUser, loadingAuth, logout } = useAuth();
