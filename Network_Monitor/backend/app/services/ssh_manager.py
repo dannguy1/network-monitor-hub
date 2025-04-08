@@ -164,6 +164,63 @@ def execute_ssh_command(device, credential, command, timeout=15):
         if client:
             client.close()
 
+def execute_commands(device, credential, commands: list, timeout=60):
+    """Executes a list of commands sequentially on the remote device via SSH,
+       capturing combined stdout and stderr.
+    Args:
+        device: The Device object.
+        credential: The Credential object.
+        commands: A list of command strings to execute.
+        timeout: Timeout in seconds for the entire operation.
+    Returns:
+        A dictionary containing: 
+          {'output': combined stdout/stderr string, 
+           'error': error message if connection failed, else None}
+    """
+    client = None
+    start_time = time.time()
+    full_output = ""
+    error_message = None
+
+    if not commands:
+        return {"output": "", "error": "No commands provided."} 
+
+    try:
+        client = _create_ssh_client(device, credential)
+        # Join commands with newline for sequential execution in one shell session
+        # Escape potentially problematic characters if needed, though basic commands are often fine.
+        full_command_str = "\n".join(commands)
+        
+        current_app.logger.info(f"Executing multiple commands on {device.ip_address}:\n{full_command_str}")
+        
+        # Execute commands - consider using invoke_shell for more interactive sessions
+        # but exec_command is simpler for sequential non-interactive commands.
+        # Need to ensure the channel stays open long enough.
+        stdin, stdout, stderr = client.exec_command(full_command_str, timeout=timeout)
+        
+        # Read stdout and stderr
+        stdout_data = stdout.read().decode('utf-8', errors='ignore')
+        stderr_data = stderr.read().decode('utf-8', errors='ignore')
+        exit_status = stdout.channel.recv_exit_status() # Wait for commands to finish
+        
+        full_output = stdout_data + stderr_data
+        duration = time.time() - start_time
+        current_app.logger.info(f"Multi-command execution on {device.ip_address} finished in {duration:.2f}s. Exit status: {exit_status}")
+        
+        # Optional: Check exit status for a general sense of success/failure
+        # if exit_status != 0:
+        #    current_app.logger.warning(f"Command sequence on {device.ip_address} exited with status {exit_status}")
+
+    except Exception as e:
+        duration = time.time() - start_time
+        current_app.logger.error(f"SSH multi-command execution failed for {device.ip_address}: {e}")
+        error_message = f"Failed to execute commands: {e}"
+    finally:
+        if client:
+            client.close()
+
+    return {"output": full_output, "error": error_message}
+
 def apply_uci_commands(device, credential, uci_commands):
     """Applies a list of UCI commands and commits them."""
     if not isinstance(uci_commands, list):
