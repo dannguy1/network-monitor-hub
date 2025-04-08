@@ -17,17 +17,16 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
 
     useEffect(() => {
         if (initialDevice) {
-            setFormData({
+            // When editing, only set device-specific fields
+            setFormData(prev => ({ 
+                ...prev, // Keep previous state (incl. default cred fields)
                 name: initialDevice.name || '',
                 ip_address: initialDevice.ip_address || '',
-                description: initialDevice.description || '',
-                credential_ssh_username: '',
-                credential_auth_type: 'password',
-                credential_password: '',
-                credential_private_key: '' 
-            });
+                description: initialDevice.description || ''
+                // Do NOT reset credential fields here
+            }));
         } else {
-            // Reset form for creation
+            // Reset form for creation (keep this block)
             setFormData({
                 name: '', ip_address: '', description: '',
                 credential_ssh_username: '', credential_auth_type: 'password',
