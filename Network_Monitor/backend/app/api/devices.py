@@ -275,71 +275,107 @@ def get_device_log_config(id):
 @api.route('/devices/<int:id>/log_config', methods=['POST'])
 @login_required
 def set_device_log_config(id):
-    """Enable or disable remote logging to this server using the device controller."""
+    """Enable or disable remote logging on the device."""
     device = db.session.get(Device, id)
     if not device:
         return jsonify({"error": "Device not found"}), 404
 
     data = request.get_json()
     if not data or 'enable' not in data or not isinstance(data['enable'], bool):
-        return jsonify({"error": "Missing or invalid required field: 'enable' (boolean)"}), 400
-
-    # Specific config generation logic remains here for now, but could be moved
-    # into the SSH controller or a helper service if it gets complex.
-    if device.control_method != 'ssh':
-         return jsonify({"error": f"Log config setting not implemented for '{device.control_method}' method."}), 501
+        return jsonify({"error": "Missing or invalid 'enable' field (must be boolean)"}), 400
 
     enable_logging = data['enable']
-    target_ip = request.host.split(':')[0] # Still potentially fragile
-    target_port = 514
-    target_proto = 'udp'
 
+    # --- Ensure we have SSH controller and credential --- #
+    if device.control_method != 'ssh':
+         return jsonify({"error": f"Remote log configuration only supported via SSH, not '{device.control_method}'."}), 501
+    if not device.credential:
+        return jsonify({"error": "Device has no associated credential for SSH access."}), 400
+
+    # --- Determine Target IP for logging --- #
+    target_ip = current_app.config.get('SYSLOG_SERVER_IP')
+    if enable_logging and not target_ip:
+         current_app.logger.error("Cannot enable remote logging: SYSLOG_SERVER_IP is not configured in the backend environment.")
+         return jsonify({"error": "Backend SYSLOG_SERVER_IP configuration missing."}), 500
+    target_port = current_app.config.get('SYSLOG_UDP_PORT', 514)
+
+    # --- Build UCI commands --- #
     uci_commands = []
-    section = LOGD_CONFIG['section']
-    log_ip_option = LOGD_CONFIG['option_log_ip']
-    log_port_option = LOGD_CONFIG['option_log_port']
-    log_proto_option = LOGD_CONFIG['option_log_proto']
+    section = LOGD_CONFIG['section'] # e.g., 'system.@system[0]'
+    config_file_name = section.split('.')[0] # e.g., 'system'
+    opt_ip = LOGD_CONFIG['option_log_ip']
+    opt_port = LOGD_CONFIG['option_log_port']
+    opt_proto = LOGD_CONFIG['option_log_proto']
 
     if enable_logging:
         uci_commands.extend([
-            f"uci set {section}.{log_ip_option}={target_ip}",
-            f"uci set {section}.{log_port_option}={target_port}",
-            f"uci set {section}.{log_proto_option}={target_proto}"
+            f"uci set {section}.{opt_ip}='{target_ip}'",
+            f"uci set {section}.{opt_port}='{target_port}'",
+            f"uci set {section}.{opt_proto}='udp'",
+            f"uci commit {config_file_name}"
         ])
     else:
         uci_commands.extend([
-            f"uci delete {section}.{log_ip_option}",
-            f"uci delete {section}.{log_port_option}",
-            f"uci delete {section}.{log_proto_option}"
+            f"uci delete {section}.{opt_ip}",
+            f"uci delete {section}.{opt_port}",
+            f"uci delete {section}.{opt_proto}",
+            f"uci commit {config_file_name}"
         ])
 
-    if not uci_commands:
-         return jsonify({"message": "No changes needed."}), 200
+    # Reload logd service to apply changes
+    restart_command = "/etc/init.d/log reload"
+    uci_commands.append(restart_command)
 
+    # --- Execute using Controller --- #
     try:
-        controller = get_device_controller(device) 
-        # Pass the generated UCI commands as config_data for SSHController
-        result = controller.apply_config(uci_commands) 
+        controller = get_device_controller(device)
+
+        if not hasattr(controller, 'execute_commands'):
+             return jsonify({"error": "Internal error: Controller does not support command execution."}), 500
+
+        current_app.logger.info(f"Attempting to {'enable' if enable_logging else 'disable'} remote logging on {device.name} ({device.ip_address})")
+        execution_result = controller.execute_commands(uci_commands)
+
+        if execution_result.get('error'):
+            current_app.logger.error(f"Failed to apply log config changes to {device.name}: {execution_result['error']}")
+            return jsonify({"error": "Failed to execute commands on device", "details": execution_result['error']}), 500
         
-        # Use the controller's restart_service method
-        if result.get("success"):
-             current_app.logger.info(f"Log config applied, now attempting restart of 'log' service for {device.name}")
-             restart_result = controller.restart_service('log') # Use the controller method
-             # Append restart status to the original message/result
-             result["message"] = (result.get("message", "") + f" | Service 'log' Restart: {restart_result.get('message')}").strip(" | ")
-             if not restart_result.get("success"):
-                 result["stderr"] = (result.get("stderr", "") + f"\nRestart Error: {restart_result.get('stderr', 'Unknown')}").strip()
-                 # Keep overall success as True from apply_config, but indicate restart issue
+        # Consider checking execution_result['output'] for specific UCI or service errors if needed
+        current_app.logger.info(f"Log config commands executed on {device.name}. Output:\n{execution_result.get('output')}")
 
-        status_code = 200 if result.get("success") else 500 # Base status on apply_config result
-        return jsonify(result), status_code
+        # --- Verify the actual state AFTER applying --- #
+        current_app.logger.info(f"Verifying log config state on {device.name} after applying changes.")
+        config_key_to_check = f"{section}.{opt_ip}"
+        verify_result = controller.get_config(config_key_to_check)
 
-    except (ValueError, TypeError, NotImplementedError) as e: # Catch factory/controller errors
+        final_enabled_state = False
+        final_target_ip = None
+        if verify_result.get("success"):
+            retrieved_ip = verify_result.get("value")
+            # Check if the retrieved IP is non-empty
+            if retrieved_ip and isinstance(retrieved_ip, str) and retrieved_ip.strip():
+                final_enabled_state = True
+                final_target_ip = retrieved_ip.strip()
+            current_app.logger.info(f"Verification result for {device.name}: Success, log_ip='{final_target_ip}' -> Enabled={final_enabled_state}")
+        else:
+            # If verification failed, log it, but proceed cautiously.
+            # Assume the operation succeeded if SSH execution didn't report an error.
+            current_app.logger.warning(f"Verification of log config failed for {device.name} after applying changes. Error: {verify_result.get('message')}. Assuming intended state.")
+            final_enabled_state = enable_logging
+            final_target_ip = target_ip if enable_logging else None
+
+        # --- Return the Correct JSON Structure --- #
+        return jsonify({
+            "remote_logging_enabled": final_enabled_state,
+            "remote_log_target": final_target_ip
+        }), 200
+
+    except (ValueError, TypeError, NotImplementedError) as e:
         current_app.logger.error(f"Controller error setting log config for {device.name}: {e}")
-        return jsonify({"error": f"Configuration error: {e}"}), 400 # Or 501 if NotImplemented
+        return jsonify({"error": f"Configuration error: {e}"}), 400
     except Exception as e:
-         current_app.logger.error(f"Unexpected error setting log config for device {id}: {e}", exc_info=True)
-         return jsonify({"error": "An unexpected internal error occurred"}), 500
+        current_app.logger.error(f"Unexpected error setting log config for {device.name}: {e}", exc_info=True)
+        return jsonify({"error": "An unexpected internal error occurred"}), 500
 
 # --- Reboot Device --- 
 @api.route('/devices/<int:id>/reboot', methods=['POST'])
