@@ -351,23 +351,6 @@ function DeviceList() {
         );
     };
 
-    const refreshDevice = useCallback((deviceId, clearFeedback = true) => {
-        if (clearFeedback) clearActionFeedback();
-        setRefreshingDevice(deviceId);
-        api.refreshDeviceStatus(deviceId)
-            .then(response => {
-                if (clearFeedback) setActionMessage(response.data.message || 'Device status refreshed.');
-                fetchDevices(false);
-            })
-            .catch(err => {
-                console.error(`Error refreshing device ${deviceId}:`, err);
-                if (clearFeedback) setActionError(err.response?.data?.error || err.message || 'Failed to refresh status');
-            })
-            .finally(() => {
-                setRefreshingDevice(null);
-            });
-    }, [fetchDevices]);
-
     if (loading && devices.length === 0) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
