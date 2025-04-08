@@ -208,30 +208,61 @@ function DeviceList() {
     };
 
     const handleToggleLogConfig = async (deviceId, currentState) => {
+        console.log(`[Toggle ${deviceId}] Handler called. Current state from props: ${currentState}`); // Log 1
         clearActionFeedback();
         const newState = !currentState;
         const originalStatus = logConfigStatus[deviceId];
-        setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...prev[deviceId], loading: true, error: null } }));
-
-        try {
-            const response = await api.toggleLogConfig(deviceId, newState);
-            setLogConfigStatus(prev => ({
+        console.log(`[Toggle ${deviceId}] New target state: ${newState}. Original status saved.`, originalStatus); // Log 2
+        
+        // Optimistic UI update
+        setLogConfigStatus(prev => {
+            const updated = {
                 ...prev,
                 [deviceId]: {
-                    loading: false,
-                    enabled: response.data.remote_logging_enabled,
-                    target: response.data.remote_log_target,
+                    ...prev[deviceId],
+                    enabled: newState, // Assume success temporarily
+                    loading: true,
                     error: null
                 }
-            }));
-             setActionMessage(`Remote logging ${newState ? 'enabled' : 'disabled'} for device.`);
-             setTimeout(() => setActionMessage(null), 3000);
+            };
+            console.log(`[Toggle ${deviceId}] Setting optimistic state (loading=true, enabled=${newState})`, updated[deviceId]); // Log 3
+            return updated;
+        });
+
+        try {
+            console.log(`[Toggle ${deviceId}] Calling API to set state to: ${newState}`); // Log 4
+            const response = await api.toggleLogConfig(deviceId, newState);
+            console.log(`[Toggle ${deviceId}] API Success. Response:`, response.data); // Log 5
+
+            // Confirm update with actual backend state
+            setLogConfigStatus(prev => {
+                const confirmed = {
+                    ...prev,
+                    [deviceId]: {
+                        loading: false, // Set loading false
+                        enabled: response.data.remote_logging_enabled,
+                        target: response.data.remote_log_target,
+                        error: null
+                    }
+                };
+                console.log(`[Toggle ${deviceId}] Setting confirmed state (loading=false, enabled=${response.data.remote_logging_enabled})`, confirmed[deviceId]); // Log 6
+                return confirmed;
+            });
+            // Keep action message logic
+            setActionMessage(`Remote logging ${newState ? 'enabled' : 'disabled'} for device.`);
+            setTimeout(() => setActionMessage(null), 3000);
         } catch (err) {
-            console.error(`Error toggling log config for device ${deviceId}:`, err);
+            console.error(`Error toggling log config for device ${deviceId}:`, err); // Log 7
             const errMsg = err.response?.data?.error || err.message || 'Failed to toggle logging';
-             setActionError(errMsg);
-             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...originalStatus, loading: false, error: errMsg } }));
+            setActionError(errMsg);
+            // Revert UI on error using the original status saved earlier
+            setLogConfigStatus(prev => {
+                const reverted = { ...prev, [deviceId]: { ...originalStatus, loading: false, error: errMsg } }; // Set loading false
+                console.log(`[Toggle ${deviceId}] Setting reverted state on error (loading=false)`, reverted[deviceId]); // Log 8
+                return reverted;
+            });
         }
+        console.log(`[Toggle ${deviceId}] Handler finished.`); // Log 9
     };
 
     const handleReboot = async (device) => {
