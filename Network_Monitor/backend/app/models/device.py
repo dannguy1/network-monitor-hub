@@ -23,6 +23,8 @@ class Device(db.Model):
     logs = relationship("LogEntry", back_populates="device", lazy='dynamic') # lazy='dynamic' for querying
 
     def to_dict(self):
+        # Serialize the credential using its own to_dict if it exists
+        credential_data = self.credential.to_dict() if self.credential else None
         return {
             'id': self.id,
             'name': self.name,
@@ -34,8 +36,8 @@ class Device(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
             'credential_id': self.credential_id,
-            'credential_name': self.credential.name if self.credential else None # Include name for convenience
-            # 'logs': [log.to_dict() for log in self.logs] # Avoid including all logs by default
+            'credential': credential_data # Include the serialized credential object
+            # 'credential_name': self.credential.name if self.credential else None # REMOVED
         }
 
     def __repr__(self):
