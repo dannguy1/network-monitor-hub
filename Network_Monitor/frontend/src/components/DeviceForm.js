@@ -16,9 +16,7 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
     const [validationError, setValidationError] = useState('');
 
     useEffect(() => {
-        console.log("[DeviceForm] useEffect triggered. Received initialDevice prop:", initialDevice); // Log received prop
         if (initialDevice) {
-            console.log("[DeviceForm] Setting form data for editing:", initialDevice); // Log data being set
             // When editing, only set device-specific fields
             setFormData(prev => {
                 const updated = { 
@@ -28,11 +26,9 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
                     description: initialDevice.description || ''
                     // Do NOT reset credential fields here
                 };
-                console.log("[DeviceForm] New formData state (edit):", updated); // Log the new state
                 return updated;
             });
         } else {
-            console.log("[DeviceForm] Resetting form data for creation."); // Log reset
             // Reset form for creation (keep this block)
             const resetData = {
                 name: '', ip_address: '', description: '',
@@ -40,7 +36,6 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
                 credential_password: '', credential_private_key: ''
             };
             setFormData(resetData);
-            console.log("[DeviceForm] New formData state (create):", resetData); // Log the reset state
         }
         setValidationError(''); // Clear errors on form load/reset
     }, [initialDevice]);

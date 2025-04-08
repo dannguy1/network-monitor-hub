@@ -301,7 +301,6 @@ function DeviceList() {
 
     const openEditForm = (device) => {
         clearActionFeedback();
-        console.log("[DeviceList] Opening edit form for:", device);
         setEditingDevice(device);
         setShowForm(true);
     };
@@ -396,12 +395,11 @@ function DeviceList() {
                  {actionMessage && <Alert variant="success" onClose={() => setActionMessage(null)} dismissible>{actionMessage}</Alert>}
 
                  {showForm && (
-                     (console.log("[DeviceList] Rendering DeviceForm with initialDevice:", editingDevice),
                      <DeviceForm 
                          initialDevice={editingDevice}
                          onSubmit={editingDevice ? handleUpdate : handleCreate}
                          onCancel={closeForm}
-                     />)
+                     />
                  )}
 
                  {loading && devices.length > 0 && <Spinner animation="border" size="sm" className="me-2" />}
