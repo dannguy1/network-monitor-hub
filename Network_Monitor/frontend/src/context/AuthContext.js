@@ -35,7 +35,9 @@ export const AuthProvider = ({ children }) => {
         setAuthError(null);
         setLoadingAuth(true); // Indicate loading during login attempt
         try {
-            const response = await api.login({ username, password });
+            const loginData = { username: username, password: password }; // Explicitly create object
+            console.log("Frontend: Sending login data:", loginData); // Add frontend debug log
+            const response = await api.login(loginData); // Pass the explicit object
             setCurrentUser(response.data);
             setLoadingAuth(false);
             return true; // Indicate success
