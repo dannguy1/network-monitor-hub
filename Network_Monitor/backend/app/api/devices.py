@@ -6,6 +6,7 @@ from ..models import Device, Credential
 from sqlalchemy.exc import IntegrityError
 from ..services.controllers import get_device_controller
 import datetime
+from ..services.ssh_manager import verify_ssh_connection
 
 @api.route('/devices', methods=['POST'])
 @login_required
@@ -413,3 +414,50 @@ def refresh_device_status(id):
     except Exception as e:
         current_app.logger.error(f"Unexpected error refreshing status for device {id}: {e}", exc_info=True)
         return jsonify({"error": "An unexpected internal error occurred during status refresh"}), 500 
+
+# --- Credential Verification (Moved to Device) --- #
+
+@api.route('/devices/<int:id>/verify_credential', methods=['POST'])
+@login_required
+def post_verify_device_credential(id):
+    """Verify the SSH connection for the credential associated with this device."""
+    device = db.session.get(Device, id)
+    if not device:
+        return jsonify({"error": "Device not found"}), 404
+    
+    if not device.credential:
+        return jsonify({"error": "Device has no associated credential to verify"}), 400
+        
+    credential = device.credential
+    
+    # Use the existing SSH Manager service logic
+    success, message = verify_ssh_connection(device, credential)
+
+    # Update device status based on verification result?
+    original_status = device.status
+    status_changed = False
+    if success:
+        if device.status != 'Online': # Update only if not already Online
+            device.status = 'Online' 
+            device.last_seen = datetime.datetime.utcnow()
+            status_changed = True
+    else:
+        if device.status != 'Offline': # Update only if not already Offline
+             device.status = 'Offline'
+             status_changed = True
+
+    if status_changed:
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"DB error updating status after verification for device {id}: {e}")
+            # Proceed to return verification result even if DB update failed
+
+    if success:
+        return jsonify({"status": "success", "message": message})
+    else:
+        # Return 400 Bad Request on verification failure, including the reason
+        return jsonify({"status": "failure", "message": message}), 400
+
+# --- End Credential Verification --- # 

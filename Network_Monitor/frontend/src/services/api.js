@@ -53,6 +53,7 @@ const rebootDevice = (deviceId) => apiClient.post(`/devices/${deviceId}/reboot`)
 const refreshDeviceStatus = (deviceId) => apiClient.post(`/devices/${deviceId}/refresh_status`); // Changed to POST
 const getLogConfig = (deviceId) => apiClient.get(`/devices/${deviceId}/log_config`);
 const toggleLogConfig = (deviceId, enable) => apiClient.post(`/devices/${deviceId}/log_config`, { enable });
+const verifyDeviceCredential = (deviceId) => apiClient.post(`/devices/${deviceId}/verify_credential`); // New function
 
 // --- Credentials (Removed most) --- //
 // const getCredentials = () => apiClient.get('/credentials'); // Keep if needed elsewhere?
@@ -60,7 +61,7 @@ const toggleLogConfig = (deviceId, enable) => apiClient.post(`/devices/${deviceI
 // const createCredential = (data) => apiClient.post('/credentials', data);
 // const updateCredential = (id, data) => apiClient.put(`/credentials/${id}`, data);
 // const deleteCredential = (id) => apiClient.delete(`/credentials/${id}`);
-const verifyCredential = (id) => apiClient.post(`/credentials/${id}/verify`); // Keep verify for now? Or move to device endpoint?
+// const verifyCredential = (id) => apiClient.post(`/credentials/${id}/verify`); // REMOVED
 
 // --- Logs --- //
 const getLogs = (params) => apiClient.get('/logs', { params });
@@ -93,7 +94,7 @@ const api = {
     // createCredential, // Removed
     // updateCredential, // Removed
     // deleteCredential, // Removed
-    verifyCredential, // Keep verify for now?
+    verifyDeviceCredential, // ADDED
     getLogs,
     applyUciToDevice,
     getDashboardSummary // Export new function

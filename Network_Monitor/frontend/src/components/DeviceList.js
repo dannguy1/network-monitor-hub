@@ -154,15 +154,16 @@ function DeviceList() {
         clearActionFeedback();
         setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'loading', message: 'Verifying...' } }));
 
-        api.verifyCredential(credentialId)
+        api.verifyDeviceCredential(deviceId)
             .then(response => {
                 setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'success', message: response.data.message || 'Verification Successful' } }));
-                refreshDevice(device.id, false);
+                fetchDevices(false);
             })
             .catch(err => {
                  console.error("Error verifying credential:", err);
                  const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Verification Failed';
                  setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'error', message: errMsg } }));
+                 fetchDevices(false);
             });
     };
 
