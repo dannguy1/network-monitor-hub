@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from ..services.controllers import get_device_controller
 import datetime
 from ..services.ssh_manager import verify_ssh_connection
+import os # Import os module
 
 @api.route('/devices', methods=['POST'])
 @login_required
@@ -293,11 +294,18 @@ def set_device_log_config(id):
         return jsonify({"error": "Device has no associated credential for SSH access."}), 400
 
     # --- Determine Target IP for logging --- #
-    target_ip = current_app.config.get('SYSLOG_SERVER_IP')
+    target_ip = os.environ.get('SYSLOG_SERVER_IP')
     if enable_logging and not target_ip:
          current_app.logger.error("Cannot enable remote logging: SYSLOG_SERVER_IP is not configured in the backend environment.")
          return jsonify({"error": "Backend SYSLOG_SERVER_IP configuration missing."}), 500
-    target_port = current_app.config.get('SYSLOG_UDP_PORT', 514)
+    
+    # Read port directly from environment or use default
+    target_port_str = os.environ.get('SYSLOG_UDP_PORT', '514')
+    try:
+        target_port = int(target_port_str)
+    except ValueError:
+        current_app.logger.warning(f"Invalid SYSLOG_UDP_PORT '{target_port_str}' in environment, using default 514.")
+        target_port = 514
 
     # --- Build UCI commands --- #
     uci_commands = []
