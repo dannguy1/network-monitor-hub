@@ -170,12 +170,29 @@ These instructions guide setting up a local development environment.
     ```bash
     npm install
     ```
-4.  **Run Development Server:**
+4.  **(Optional) Configure Proxy for Separate Backend Host:**
+    *   If your backend Flask server is running on a **different host or IP** than your frontend development server (e.g., backend on RPi, frontend on your laptop), you need to configure the React dev server's proxy.
+    *   Edit `frontend/package.json` and add a `"proxy"` key pointing to your backend server's base URL:
+        ```json
+        {
+          ...
+          "browserslist": {
+            ...
+          },
+          "proxy": "http://<your_backend_ip_or_hostname>:5000" 
+        }
+        ```
+        Replace `<your_backend_ip_or_hostname>` with the actual IP or hostname (e.g., `http://192.168.10.12:5000`).
+    *   Ensure you **do not** have `REACT_APP_API_BASE_URL` set in `frontend/.env`, as this would override the proxy.
+    *   This proxy allows the browser to make API requests to your frontend server's origin (e.g., `http://localhost:3000/api/v1/...`), which the dev server then forwards to the backend. This avoids cross-origin cookie issues during development.
+
+5.  **Run Development Server:**
     ```bash
     npm start
     ```
     *   The React frontend will open in your browser, usually at `http://localhost:3000`.
-    *   API requests from the frontend will target the backend server directly at `http://localhost:5000` (as configured in `src/services/api.js`).
+    *   If the proxy is configured (Step 4), API requests will be forwarded to the specified backend URL. Otherwise, requests targeting relative paths like `/api/v1` assume the backend runs on the *same* host and port as the frontend dev server (which typically requires Nginx or similar in production but might work if both run on `localhost` in simple dev setups).
+    *   The default API base URL in `src/services/api.js` is `/api/v1`. It relies on the proxy (if configured) or expects the backend to be served from the same origin.
 
 ## Running Background Tasks (Development)
 
