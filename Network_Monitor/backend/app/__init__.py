@@ -73,9 +73,10 @@ def create_app(config_name=None):
     # --- End explicit load --- #
 
     # Allow requests from the frontend origin (adjust in production)
-    frontend_origin = app.config.get('FRONTEND_ORIGIN', 'http://localhost:3000')
-    print(f"DEBUG: Configuring CORS for origin: {frontend_origin}")
-    CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": frontend_origin}})
+    # Read directly from os.environ after loading .env
+    frontend_origin_env = os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000')
+    print(f"DEBUG: Configuring CORS for origin: {frontend_origin_env}")
+    CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": frontend_origin_env}})
 
     # Register blueprints
     from .api import api as api_blueprint

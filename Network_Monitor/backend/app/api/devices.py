@@ -356,14 +356,13 @@ def refresh_device_status(id):
                 "last_seen": device.last_seen.isoformat() if device.last_seen else None,
                 "status_changed": status_changed
             }), 200
-        except Exception as db_e:
+        except DatabaseError as db_e:
             db.session.rollback()
-            current_app.logger.error(f"Failed to update device status after refresh for {device.name}: {db_e}")
-            # Return info about the check, but indicate DB error
-            return jsonify({ 
-                "success": False, # Overall operation failed (db update)
-                "message": f"Verification attempt resulted in message '{check_result.get("message")}', but failed to save status update: {db_e}", 
-                "error": "Database update failed" 
+            # Log the specific error db_e here
+            error_message = f"Verification attempt resulted in message {check_result.get('message')}, but failed to save status update: {db_e}"
+            return jsonify({
+                "error": "Database error during status update after verification.",
+                "message": error_message
             }), 500
             
     except (ValueError, TypeError, NotImplementedError) as e: # Catch factory/controller errors
