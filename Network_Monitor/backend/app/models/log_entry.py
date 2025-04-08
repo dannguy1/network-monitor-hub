@@ -12,8 +12,21 @@ class LogEntry(db.Model):
     timestamp = db.Column(db.DateTime, nullable=False, index=True, default=datetime.datetime.utcnow)
     log_level = db.Column(db.String(50), nullable=True, index=True)
     process_name = db.Column(db.String(128), nullable=True, index=True)
-    message = db.Column(db.Text, nullable=False)
-    raw_message = db.Column(db.Text, nullable=True) # Store the original if needed
+    message = db.Column(db.Text) # Keep for main message text after tag/hostname removed
+    hostname = db.Column(db.String(255)) # Hostname reported in the log (might differ from device name)
+    tag = db.Column(db.String(100)) # Process name/tag (e.g., 'kernel', 'dnsmasq[1234]')
+    
+    # --- NEW FIELDS FOR AI PREP --- #
+    raw_message = db.Column(db.Text, nullable=True) # Store the original syslog message
+    service_name = db.Column(db.String(100), nullable=True, index=True) # Parsed service (e.g., 'kernel', 'dnsmasq', 'sshd')
+    src_ip = db.Column(db.String(45), nullable=True, index=True) # IPv4 or IPv6
+    dst_ip = db.Column(db.String(45), nullable=True, index=True)
+    src_port = db.Column(db.Integer, nullable=True)
+    dst_port = db.Column(db.Integer, nullable=True)
+    protocol = db.Column(db.String(10), nullable=True, index=True) # e.g., TCP, UDP, ICMP
+    fw_action = db.Column(db.String(20), nullable=True, index=True) # e.g., ACCEPT, DROP, REJECT
+    # Add more parsed fields as needed (e.g., user, url, dns_query)
+    # --- END NEW FIELDS --- #
 
     # Structured data extracted during reformatting
     structured_data = db.Column(JSON, nullable=True)
