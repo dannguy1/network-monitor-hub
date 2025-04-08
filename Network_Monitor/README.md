@@ -113,7 +113,8 @@ These instructions guide setting up a local development environment.
             # Ensure virtualenv is active first!
             python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
             ```
-        *   Review `DATABASE_URL`. For development, leaving it commented out or empty typically defaults to SQLite (`backend/data/app.db`).
+        *   Review `DATABASE_URL`. For development with the default SQLite setup, it's best to **leave this line commented out or remove it entirely**. This allows the application to use the default absolute path configured in `backend/config.py`, which points correctly to `backend/data/app.db`.
+        *   If you uncomment `DATABASE_URL` for SQLite, ensure you provide the correct **absolute** path (e.g., `DATABASE_URL=sqlite:////full/path/to/Network_Monitor/backend/data/app.db`). Using a relative path like `sqlite:///data/app.db` will likely cause "unable to open database file" errors when running `flask db` commands.
         *   Configure `AI_ENGINE_*` variables if using the AI push feature.
 7.  **Initialize Database:**
     *   Ensure the virtual environment is active (`source backend/venv/bin/activate`).
