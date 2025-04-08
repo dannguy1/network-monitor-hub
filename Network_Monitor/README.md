@@ -116,7 +116,7 @@ These instructions guide setting up a local development environment.
         *   Review `DATABASE_URL`. For development with the default SQLite setup, it's best to **leave this line commented out or remove it entirely**. This allows the application to use the default absolute path configured in `backend/config.py`, which points correctly to `backend/data/app.db`.
         *   If you uncomment `DATABASE_URL` for SQLite, ensure you provide the correct **absolute** path (e.g., `DATABASE_URL=sqlite:////full/path/to/Network_Monitor/backend/data/app.db`). Using a relative path like `sqlite:///data/app.db` will likely cause "unable to open database file" errors when running `flask db` commands.
         *   Configure `AI_ENGINE_*` variables if using the AI push feature.
-7.  **Initialize Database:**
+7.  **Initialize Database (First Time Setup):**
     *   Ensure the virtual environment is active (`source backend/venv/bin/activate`).
     *   **Stay in the project root directory (`Network_Monitor`)**.
     *   Set required Flask environment variables:
@@ -137,27 +137,34 @@ These instructions guide setting up a local development environment.
         ```bash
         mkdir -p backend/data
         ```
-    *   Initialize the database migration repository (only run once per project):
+    *   **Initialize the migration environment** (only run once per project lifetime):
         ```bash
         flask db init
         ```
-    *   Generate the initial migration script based on your models:
+    *   **Generate the initial migration script** based on your models (run this after `init` or whenever models change):
         ```bash
-        flask db migrate -m "Initial database schema"
+        flask db migrate -m "Initial database schema" 
+        # Use a descriptive message if migrating model changes later
         ```
-    *   Apply the migration to create the database tables:
+    *   **Apply the migration** to create/update the database tables (run this after `migrate`):
         ```bash
         flask db upgrade
         ```
+    *   **Create your first admin user** (run *after* `flask db upgrade`):
+        ```bash
+        flask create-user <username> 
+        # You will be prompted securely for the password
+        ```
+
 8.  **Run Development Web Server:**
     *   Ensure the virtual environment is active.
     *   **Stay in the project root directory (`Network_Monitor`)**.
     *   Ensure `FLASK_APP` and `FLASK_CONFIG` are set (see step 7).
     *   Run the Flask development server:
         ```bash
-        flask run
+        flask run --host=0.0.0.0 # Optional: --host=0.0.0.0 to access from other devices
         ```
-    *   The backend API should now be running at `http://localhost:5000`.
+    *   The backend API should now be running (default: `http://localhost:5000`).
     *   The AI Pusher scheduler (if configured) will start automatically.
 
 ### Frontend
@@ -376,13 +383,16 @@ These steps provide a general guide for deploying on a Debian-based system like 
 *   **Configure Firewall:** Ensure ports (e.g., 80/443 for HTTP/S, 514/UDP for syslog) are open.
 *   **Configure OpenWRT Devices:** Point remote syslog to your server's IP, using the configured UDP port (e.g., 514).
 *   **Access Web UI:** `http(s)://<YOUR_SERVER_IP_OR_HOSTNAME>`.
-*   **Create Admin User:**
+*   **Create Admin User (if not done during setup):**
+    *   *Note: If you followed the Development Setup above, you likely created a user already. This is mainly if setting up directly for production.* 
     ```bash
     cd /opt/network-monitor
     source backend/venv/bin/activate
     export FLASK_APP=backend.app:create_app
-    export FLASK_CONFIG=production
-    flask create-user <username> <password> # Follow prompts
+    export FLASK_CONFIG=production # Or development if appropriate
+    # Ensure migrations are applied first: flask db upgrade 
+    flask create-user <username> # Enter the desired username
+    # You will be prompted securely for the password
     unset FLASK_APP FLASK_CONFIG
     deactivate
     ```
