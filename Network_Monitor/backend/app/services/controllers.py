@@ -150,6 +150,19 @@ class SSHDeviceController(DeviceController):
         
         return result # execute_ssh_command should return the required dict structure
 
+    def execute_commands(self, commands: list, timeout=60) -> dict:
+        """Executes a list of arbitrary commands sequentially via SSH.
+        Args:
+            commands: A list of command strings.
+            timeout: Timeout for the entire operation.
+        Returns:
+            A dictionary: {'output': combined stdout/stderr string, 'error': error message or None}
+        """
+        current_app.logger.debug(f"SSHController: Executing arbitrary commands on {self.device.ip_address} via SSH")
+        # Directly call the function in ssh_manager
+        result = ssh_manager.execute_commands(self.device, self.credential, commands, timeout=timeout)
+        return result
+
 # --- (Placeholder for future REST implementation) ---
 # class RESTDeviceController(DeviceController):
 #     def __init__(self, device: Device):

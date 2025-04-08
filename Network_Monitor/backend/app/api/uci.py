@@ -6,7 +6,6 @@ from ..services.controllers import get_device_controller, SSHController
 
 # Define the Blueprint
 bp = Blueprint('uci', __name__)
-print("DEBUG: UCI Blueprint module loaded")
 
 @bp.route('/devices/<int:id>/apply', methods=['POST'])
 @login_required
