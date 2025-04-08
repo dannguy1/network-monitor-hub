@@ -96,7 +96,7 @@ function DeviceList() {
         .finally(() => {
             setLoading(false);
         });
-    }, [selectedCredential, fetchLogConfig]); // fetchLogConfig dependency is now valid
+    }, [fetchLogConfig]);
 
     useEffect(() => {
         fetchDevices(true);
