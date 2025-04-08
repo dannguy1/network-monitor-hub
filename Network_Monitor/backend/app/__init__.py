@@ -92,15 +92,8 @@ def create_app(config_name=None):
     app.register_blueprint(dashboard_bp, url_prefix='/api/v1/dashboard')
 
     # Import and register the new UCI blueprint
-    # --- Add explicit try-except for UCI blueprint import --- #
-    try:
-        from .api.uci import bp as uci_bp
-        app.register_blueprint(uci_bp, url_prefix='/api/v1/uci')
-        print("DEBUG: Successfully imported and registered UCI blueprint.")
-    except Exception as e:
-        print(f"CRITICAL: Failed to import or register UCI blueprint! Error: {e}", flush=True)
-        # Optionally re-raise or handle as needed, but printing is key for debug
-    # --- End explicit try-except --- #
+    from .api.uci import bp as uci_bp
+    app.register_blueprint(uci_bp, url_prefix='/api/v1/uci')
 
     # Register CLI commands (important for background tasks management)
     from . import cli

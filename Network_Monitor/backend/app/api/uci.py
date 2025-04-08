@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required
 from .. import db
 from ..models import Device
-from ..services.controllers import get_device_controller, SSHController
+from ..services.controllers import get_device_controller, SSHDeviceController
 
 # Define the Blueprint
 bp = Blueprint('uci', __name__)
@@ -27,7 +27,7 @@ def apply_uci_commands(id):
         controller = get_device_controller(device)
         
         # Ensure controller supports execute_commands (or is SSHController)
-        if not isinstance(controller, SSHController) or not hasattr(controller, 'execute_commands'):
+        if not isinstance(controller, SSHDeviceController) or not hasattr(controller, 'execute_commands'):
              return jsonify({"error": f"Device controller ({type(controller).__name__}) does not support arbitrary command execution."}), 501
 
         # Call the new execute_commands method
