@@ -344,6 +344,9 @@ function DeviceList() {
             });
     }, [fetchDevices]);
 
+    // Add console log before return
+    console.log("Rendering DeviceList with devices state:", devices);
+
     if (loading && devices.length === 0) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
