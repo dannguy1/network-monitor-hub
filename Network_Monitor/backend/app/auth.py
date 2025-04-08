@@ -1,9 +1,16 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import User
-from . import db, limiter
+from . import db, limiter, login_manager
 
 auth = Blueprint('auth', __name__)
+
+# --- Add User Loader --- #
+@login_manager.user_loader
+def load_user(user_id):
+    # user_id is typically the primary key as a string
+    return User.query.get(int(user_id))
+# --- End User Loader --- #
 
 @auth.route('/login', methods=['POST'])
 @limiter.limit("5 per minute")
