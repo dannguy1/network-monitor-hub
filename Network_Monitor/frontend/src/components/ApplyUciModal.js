@@ -25,9 +25,8 @@ function ApplyUciModal({ device, onSubmit, onCancel }) {
         }
 
         try {
-            // Call the renamed API function with the correct payload structure
-            await api.applyDeviceConfig(device.id, commandsArray);
-            // onSubmit might now receive the result if needed, but currently just closes modal
+            // Call the CORRECT API function: applyUciToDevice
+            await api.applyUciToDevice(device.id, commandsArray);
             onSubmit(); // Call the prop passed down from DeviceList
         } catch (err) {
             console.error("Error applying UCI commands via modal:", err);
