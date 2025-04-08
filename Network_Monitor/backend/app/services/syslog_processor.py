@@ -109,6 +109,7 @@ def process_log_batch(log_batch):
     error_count = 0
     logs_to_add = []
     devices_to_update = {} # Track devices whose last_seen needs update {device_id: device_obj}
+    received_time = datetime.now(timezone.utc) # Get timestamp for this batch
 
     # --- Pre-fetch devices based on potential identifiers --- 
     # This is less efficient if identifiers are hostnames, as we might need two queries
@@ -145,8 +146,9 @@ def process_log_batch(log_batch):
         log_entry = LogEntry(
             device_id=device.id,
             # Store the *actual* IP of the found device, not necessarily the lookup_identifier
-            device_ip=device_ip_for_log, 
-            timestamp=parsed_data['timestamp'],
+            device_ip=device_ip_for_log,
+            # timestamp=parsed_data['timestamp'], # OLD: Use parsed timestamp
+            timestamp=received_time, # NEW: Use arrival timestamp
             log_level=parsed_data.get('log_level'),
             process_name=parsed_data.get('process_name'),
             message=parsed_data['message'],
@@ -159,7 +161,8 @@ def process_log_batch(log_batch):
     if logs_to_add:
         try:
             # Update last_seen for all affected devices
-            now = datetime.now(timezone.utc)
+            # Use the same received_time for consistency in this batch
+            now = received_time 
             for dev in devices_to_update.values():
                  dev.last_seen = now
                  db.session.add(dev) # Add device updates to session
@@ -176,7 +179,8 @@ def process_log_batch(log_batch):
             current_app.logger.error(f"Failed to save log batch to database: {e}", exc_info=True)
     elif devices_to_update: # Commit if only device updates happened (e.g., processing empty lines)
         try:
-            now = datetime.now(timezone.utc)
+            # Use the same received_time for consistency in this batch
+            now = received_time
             for dev in devices_to_update.values():
                  dev.last_seen = now
                  db.session.add(dev)

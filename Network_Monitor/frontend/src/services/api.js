@@ -72,6 +72,7 @@ const applyUciToDevice = (deviceId, commands) => apiClient.post(`/uci/devices/${
 // --- Dashboard --- //
 const getDashboardSummary = () => apiClient.get('/dashboard/summary'); // New
 
+const deleteAllLogs = () => apiClient.delete('/logs');
 
 const api = {
     login,
@@ -97,7 +98,8 @@ const api = {
     verifyDeviceCredential, // ADDED
     getLogs,
     applyUciToDevice,
-    getDashboardSummary // Export new function
+    getDashboardSummary, // Export new function
+    deleteAllLogs
 };
 
 export default api; 

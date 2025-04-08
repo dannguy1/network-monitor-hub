@@ -20,7 +20,12 @@ class Device(db.Model):
     credential = relationship("Credential", back_populates="device", foreign_keys=[credential_id])
 
     # Relationship to Log Entries (one-to-many Device -> LogEntry)
-    logs = relationship("LogEntry", back_populates="device", lazy='dynamic') # lazy='dynamic' for querying
+    logs = relationship(
+        "LogEntry", 
+        back_populates="device", 
+        lazy='dynamic', 
+        cascade="all, delete-orphan"
+    )
 
     def to_dict(self):
         # Serialize the credential using its own to_dict if it exists

@@ -101,13 +101,20 @@ def create_app(config_name=None):
 
     # Schedule tasks if needed (make sure this runs only once)
     if not app.config.get('TESTING'): # Don't run scheduler in tests easily
-        # Check if the job is already scheduled to avoid duplicates on reload
-        if not scheduler.get_job('push_ai_logs'):
-            from .services.ai_pusher import push_logs_to_ai
-            push_interval = app.config.get('AI_PUSH_INTERVAL_MINUTES', 10)
-            scheduler.add_job(id='push_ai_logs', func=push_logs_to_ai,
-                              trigger='interval', minutes=push_interval)
-            print(f"Scheduled AI log push every {push_interval} minutes.")
+        # Check if AI endpoint is configured before scheduling
+        ai_endpoint = app.config.get('AI_ENGINE_ENDPOINT')
+        if ai_endpoint:
+            # Check if the job is already scheduled to avoid duplicates on reload
+            if not scheduler.get_job('push_ai_logs'):
+                from .services.ai_pusher import push_logs_to_ai
+                push_interval = app.config.get('AI_PUSH_INTERVAL_MINUTES', 10)
+                scheduler.add_job(id='push_ai_logs', func=push_logs_to_ai,
+                                trigger='interval', minutes=push_interval)
+                print(f"AI Pusher Enabled: Scheduled AI log push to {ai_endpoint} every {push_interval} minutes.")
+            else:
+                print("AI Pusher: Job 'push_ai_logs' already scheduled.")
+        else:
+             print("AI Pusher Disabled: AI_ENGINE_ENDPOINT not configured in environment/config.")
 
     print(f"App created with config: {config_name}")
     return app 

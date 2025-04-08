@@ -146,39 +146,31 @@ def update_device(id):
 @api.route('/devices/<int:id>', methods=['DELETE'])
 @login_required
 def delete_device(id):
-    """Delete a device."""
+    """Delete a device and its associated logs via cascade."""
     device = db.session.get(Device, id)
     if device is None:
         return jsonify({"error": "Device not found"}), 404
 
-    # Consider implications: What happens to associated logs or credentials?
-    # Option 1: Delete logs (cascade delete in model or manual delete here)
-    # Option 2: Keep logs but disassociate (set device_id to null if allowed)
-    # Option 3: Prevent deletion if logs exist
-    # For now, let's assume we delete the device only. Need to handle FK constraints.
-    # If credentials have FK constraint, they might need to be deleted or unlinked first.
-    if device.credential:
-         # Simple approach: unlink credential association first
-         device.credential_id = None
-         device.credential = None
-         db.session.add(device) # stage the change
-         # Note: This does NOT delete the credential itself, just the link.
-         # You might want a different strategy (e.g., delete credential if not used elsewhere)
-
-    # Similar consideration for logs. If LogEntry.device_id cannot be NULL,
-    # deletion will fail unless logs are deleted first or handled by cascade.
-    # Assuming cascade delete is NOT set for logs for now.
-    if device.logs.first(): # Check if any logs exist for this device
-        return jsonify({"error": "Cannot delete device with associated logs. Please delete logs first or implement log deletion logic."}), 409
+    # No need to manually unlink credential, cascade should handle if needed?
+    # Actually, the Credential relationship is nullable and doesn't have cascade by default.
+    # Unlinking might still be desired if we want to keep orphaned credentials.
+    # If credential should ALSO be deleted if it's only used by this device, more logic is needed.
+    # For now, just deleting the device (and its logs via cascade).
+    
+    # REMOVED: Check for existing logs, as cascade delete handles this now.
+    # if device.logs.first(): 
+    #    return jsonify({"error": "Cannot delete device with associated logs..."}), 409
 
     db.session.delete(device)
     try:
         db.session.commit()
+        current_app.logger.info(f"Deleted device {device.name} (ID: {id}) and associated logs via cascade.")
     except Exception as e:
         db.session.rollback()
+        current_app.logger.error(f"Error deleting device {id}: {e}", exc_info=True)
         return jsonify({"error": "Failed to delete device", "message": str(e)}), 500
 
-    return jsonify({"message": "Device deleted successfully"}), 200
+    return jsonify({"message": "Device and associated logs deleted successfully"}), 200
 
 # --- Device Control Endpoints (Refactored to use Controller) ---
 

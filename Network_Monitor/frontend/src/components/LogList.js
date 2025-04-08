@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 // Import necessary React-Bootstrap components
-import { Table, Spinner, Alert, Pagination, Card, Form, Row, Col, Button, Badge } from 'react-bootstrap';
+import { Table, Spinner, Alert, Pagination, Card, Form, Row, Col, Button, Badge, Modal, Toast, ToastContainer } from 'react-bootstrap';
+import { ArrowClockwise, Trash } from 'react-bootstrap-icons'; // Import refresh and trash icons
 
 // Define common log levels for filtering
 const LOG_LEVELS = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY'];
+const DEFAULT_LOGS_PER_PAGE = 50; // Set default page size
 
 function LogList() {
     const [logs, setLogs] = useState([]);
@@ -21,12 +23,19 @@ function LogList() {
     // Active filters sent to API
     const [activeFilters, setActiveFilters] = useState({});
     const [currentPage, setCurrentPage] = useState(1);
+    // Confirmation modal state
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [clearingLogs, setClearingLogs] = useState(false);
+    // Toast notification state
+    const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
+    const [toastVariant, setToastVariant] = useState('success');
 
     const fetchLogsAndDevices = useCallback(() => {
         setLoading(true);
         setError(null);
 
-        const logParams = { ...activeFilters, page: currentPage, per_page: 30 }; // Increase per_page
+        const logParams = { ...activeFilters, page: currentPage, per_page: DEFAULT_LOGS_PER_PAGE };
 
         Promise.all([
             api.getLogs(logParams),
@@ -76,6 +85,41 @@ function LogList() {
         setCurrentPage(1);
     };
     // --- End Filter Handling ---
+
+    // --- Refresh Handling ---
+    const handleRefresh = () => {
+        setError(null); // Clear previous errors on refresh
+        fetchLogsAndDevices(); // Re-fetch data with current page and filters
+    };
+    // --- End Refresh Handling ---
+
+    // --- Clear Logs Handling ---
+    const handleShowClearConfirm = () => setShowClearConfirm(true);
+    const handleCloseClearConfirm = () => setShowClearConfirm(false);
+
+    const handleClearLogs = async () => {
+        setClearingLogs(true);
+        setError(null);
+        try {
+            const response = await api.deleteAllLogs();
+            setToastMessage(response.data.message || 'Logs cleared successfully!');
+            setToastVariant('success');
+            setShowToast(true);
+            handleCloseClearConfirm();
+            handleRefresh(); // Refresh the log list after clearing
+        } catch (err) {
+            console.error("Error clearing logs:", err);
+            const errorMsg = err.response?.data?.error || err.message || 'Failed to clear logs';
+            setError(errorMsg);
+            setToastMessage(errorMsg);
+            setToastVariant('danger');
+            setShowToast(true);
+            handleCloseClearConfirm(); // Still close modal on error
+        } finally {
+            setClearingLogs(false);
+        }
+    };
+    // --- End Clear Logs Handling ---
 
     // --- Pagination Handling ---
     const handlePageChange = (newPage) => {
@@ -145,9 +189,20 @@ function LogList() {
     }
 
     return (
+        <>
          <Card>
              <Card.Header>
-                 <h4 className="mb-0">System Logs</h4>
+                 <div className="d-flex justify-content-between align-items-center">
+                     <h4 className="mb-0">System Logs</h4>
+                     <div> {/* Group buttons */} 
+                         <Button variant="outline-danger" size="sm" onClick={handleShowClearConfirm} disabled={loading || clearingLogs} className="me-2"> 
+                             <Trash className="me-1" /> Clear All Logs
+                         </Button>
+                         <Button variant="outline-secondary" size="sm" onClick={handleRefresh} disabled={loading || clearingLogs}>
+                             <ArrowClockwise className="me-1" /> Refresh
+                         </Button>
+                    </div>
+                 </div>
              </Card.Header>
              <Card.Body>
                  {/* Filter Section */}
@@ -218,7 +273,7 @@ function LogList() {
                          </Spinner>
                     </div>
                  )}
-                {error && <Alert variant="danger">Error loading logs: {error}</Alert>}
+                {error && !clearingLogs && <Alert variant="danger">Error: {error}</Alert>}
 
                  {/* Log Table */} 
                  {!loading && !error && (
@@ -271,6 +326,35 @@ function LogList() {
                  )}
              </Card.Body>
          </Card>
+
+         {/* Confirmation Modal */}
+         <Modal show={showClearConfirm} onHide={handleCloseClearConfirm} centered>
+             <Modal.Header closeButton>
+                 <Modal.Title>Confirm Clear Logs</Modal.Title>
+             </Modal.Header>
+             <Modal.Body>
+                 Are you sure you want to permanently delete all log entries? This action cannot be undone.
+             </Modal.Body>
+             <Modal.Footer>
+                 <Button variant="secondary" onClick={handleCloseClearConfirm} disabled={clearingLogs}>
+                     Cancel
+                 </Button>
+                 <Button variant="danger" onClick={handleClearLogs} disabled={clearingLogs}>
+                     {clearingLogs ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : 'Clear All Logs'}
+                 </Button>
+             </Modal.Footer>
+         </Modal>
+
+         {/* Toast Notifications */}
+         <ToastContainer position="top-end" className="p-3" style={{ zIndex: 1056 }}>
+            <Toast onClose={() => setShowToast(false)} show={showToast} delay={5000} autohide bg={toastVariant}>
+                <Toast.Header closeButton={true}>
+                     <strong className="me-auto">Log Action</strong>
+                 </Toast.Header>
+                 <Toast.Body className={toastVariant === 'danger' ? 'text-white' : ''}>{toastMessage}</Toast.Body>
+             </Toast>
+         </ToastContainer>
+        </>
     );
 }
 

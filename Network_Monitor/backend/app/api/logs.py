@@ -1,9 +1,11 @@
 from flask import request, jsonify
+from flask_login import login_required
 from . import api
 from .. import db
 from ..models import LogEntry, Device
 from sqlalchemy import desc
 import dateutil.parser
+from flask import current_app
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 500
@@ -99,6 +101,20 @@ def get_log_entry(id):
     if log_entry is None:
         return jsonify({"error": "Log entry not found"}), 404
     return jsonify(log_entry.to_dict())
+
+@api.route('/logs', methods=['DELETE'])
+@login_required
+def delete_all_logs():
+    """Delete all log entries from the database."""
+    try:
+        num_deleted = db.session.query(LogEntry).delete()
+        db.session.commit()
+        current_app.logger.info(f"Deleted {num_deleted} log entries by user request.")
+        return jsonify({"message": f"Successfully deleted {num_deleted} log entries."}), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting all log entries: {e}", exc_info=True)
+        return jsonify({"error": "Failed to delete logs", "message": str(e)}), 500
 
 # Note: POST/PUT/DELETE for individual logs are typically not exposed via API.
 # Logs are usually ingested via the syslog mechanism.
