@@ -48,23 +48,18 @@ function ApplyUciModal({ device, onSubmit, onCancel }) {
                 {error && <Alert variant="danger">{error}</Alert>}
                 <Form onSubmit={handleSubmit}>
                     <Form.Group className="mb-3">
-                        <Form.Label>UCI Commands (one per line)</Form.Label>
+                        <Form.Label>UCI Commands</Form.Label>
                         <Form.Control
                             as="textarea"
                             rows={10}
+                            placeholder="Example:\nset system.@system[0].hostname='MyNewHostname'\nset network.lan.ipaddr='192.168.2.1'\n# uci commit system \n# uci commit network \nreboot"
                             value={uciCommands}
                             onChange={(e) => setUciCommands(e.target.value)}
-                            placeholder={`# Example:
-uci set system.@system[0].hostname='MyRouter'
-uci set network.lan.ipaddr='192.168.1.1'
-uci commit system
-uci commit network
-/etc/init.d/network reload`}
                             disabled={loading}
                         />
-                         <Form.Text muted>
-                            Enter UCI commands to be executed sequentially. Lines starting with # are ignored. 
-                            Remember to include `uci commit <config>` if needed.
+                        <Form.Text className="text-muted">
+                            Enter UCI commands to be executed sequentially. Lines starting with # are ignored.
+                            Remember to include {'`uci commit <config>`'} if needed.
                         </Form.Text>
                     </Form.Group>
                     <div className="d-flex justify-content-end">
