@@ -66,13 +66,16 @@ def create_app(config_name=None):
     # Setup CORS properly
     # Allow requests from the frontend origin (adjust in production)
     frontend_origin = app.config.get('FRONTEND_ORIGIN', 'http://localhost:3000')
+    print(f"DEBUG: Configuring CORS for origin: {frontend_origin}")
     CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": frontend_origin}})
 
     # Register blueprints
     from .api import api as api_blueprint
     app.register_blueprint(api_blueprint, url_prefix='/api/v1')
+
+    # Register auth blueprint under /api/v1 as well
     from .auth import auth as auth_blueprint
-    app.register_blueprint(auth_blueprint, url_prefix='/auth')
+    app.register_blueprint(auth_blueprint, url_prefix='/api/v1/auth')
 
     # Import and register the new dashboard blueprint
     from .api.dashboard import bp as dashboard_bp
