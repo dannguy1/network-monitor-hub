@@ -1,25 +1,43 @@
 import React, { useState, useEffect } from 'react';
+import { Form, Button, Col, Row, Alert } from 'react-bootstrap'; // Import Bootstrap components
 
 function DeviceForm({ initialDevice, onSubmit, onCancel }) {
-    // Initialize form state either with initialDevice (for editing) or empty (for creating)
+    const isEditing = !!initialDevice;
     const [formData, setFormData] = useState({
         name: '',
         ip_address: '',
         description: '',
+        // Credential fields - initialize empty
+        credential_name: '',
+        credential_ssh_username: '',
+        credential_auth_type: 'password', // Default auth type
+        credential_password: '',
+        credential_private_key: ''
     });
+    const [validationError, setValidationError] = useState('');
 
-    // When initialDevice changes (e.g., when opening the form for editing), update the form data
     useEffect(() => {
         if (initialDevice) {
             setFormData({
                 name: initialDevice.name || '',
                 ip_address: initialDevice.ip_address || '',
                 description: initialDevice.description || '',
+                // Don't populate credential fields when editing - assume they can't be changed here
+                credential_name: '', 
+                credential_ssh_username: '',
+                credential_auth_type: 'password',
+                credential_password: '',
+                credential_private_key: '' 
             });
         } else {
-            // Reset form when creating a new device or closing
-            setFormData({ name: '', ip_address: '', description: '' });
+            // Reset form for creation
+            setFormData({
+                name: '', ip_address: '', description: '',
+                credential_name: '', credential_ssh_username: '', credential_auth_type: 'password',
+                credential_password: '', credential_private_key: ''
+            });
         }
+        setValidationError(''); // Clear errors on form load/reset
     }, [initialDevice]);
 
     const handleChange = (e) => {
@@ -29,57 +47,163 @@ function DeviceForm({ initialDevice, onSubmit, onCancel }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Basic validation
+        setValidationError(''); // Clear previous errors
+
+        // Basic device validation
         if (!formData.name || !formData.ip_address) {
-            alert('Name and IP Address are required.');
+            setValidationError('Device Name and IP Address are required.');
             return;
         }
-        onSubmit(formData); // Pass the form data to the parent component's handler
+
+        // Credential validation only when CREATING
+        if (!isEditing) {
+            if (!formData.credential_name || !formData.credential_ssh_username || !formData.credential_auth_type) {
+                setValidationError('Credential Name, SSH Username, and Auth Type are required when creating a device.');
+                return;
+            }
+            if (formData.credential_auth_type === 'password' && !formData.credential_password) {
+                setValidationError('Password is required for password authentication.');
+                return;
+            }
+            if (formData.credential_auth_type === 'key' && !formData.credential_private_key) {
+                setValidationError('Private Key is required for key authentication.');
+                return;
+            }
+        }
+        
+        // Prepare data to send (exclude credential fields if editing)
+        const dataToSend = {
+            name: formData.name,
+            ip_address: formData.ip_address,
+            description: formData.description
+        };
+        if (!isEditing) {
+             Object.assign(dataToSend, {
+                credential_name: formData.credential_name,
+                credential_ssh_username: formData.credential_ssh_username,
+                credential_auth_type: formData.credential_auth_type,
+                credential_password: formData.credential_password,
+                credential_private_key: formData.credential_private_key
+             });
+        }
+
+        onSubmit(dataToSend); // Pass the potentially combined data
     };
 
     return (
-        <form onSubmit={handleSubmit} style={{ border: '1px dashed #ccc', padding: '15px', marginBottom: '15px' }}>
-            <h3>{initialDevice ? 'Edit Device' : 'Add New Device'}</h3>
-            <div style={{ marginBottom: '10px' }}>
-                <label htmlFor="name">Name: </label>
-                <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-                <label htmlFor="ip_address">IP Address: </label>
-                <input
-                    type="text"
-                    id="ip_address"
-                    name="ip_address"
-                    value={formData.ip_address}
-                    onChange={handleChange}
-                    required
-                />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-                <label htmlFor="description">Description: </label>
-                <textarea
-                    id="description"
+        <Form onSubmit={handleSubmit} className="mb-4 p-3 border rounded bg-light">
+            <h3>{isEditing ? 'Edit Device' : 'Add New Device'}</h3>
+            {validationError && <Alert variant="danger">{validationError}</Alert>}
+            <Row className="mb-3">
+                <Form.Group as={Col} controlId="formDeviceName">
+                    <Form.Label>Device Name*</Form.Label>
+                    <Form.Control
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                    />
+                </Form.Group>
+                <Form.Group as={Col} controlId="formDeviceIp">
+                    <Form.Label>IP Address*</Form.Label>
+                    <Form.Control
+                        type="text"
+                        name="ip_address"
+                        value={formData.ip_address}
+                        onChange={handleChange}
+                        required
+                    />
+                </Form.Group>
+            </Row>
+            <Form.Group className="mb-3" controlId="formDeviceDescription">
+                <Form.Label>Description</Form.Label>
+                <Form.Control
+                    as="textarea"
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
-                    rows="3"
-                    style={{ width: '90%' }}
+                    rows={2}
                 />
+            </Form.Group>
+
+            {!isEditing && (
+                <>
+                    <hr />
+                    <h4>Device Credentials (Required)</h4>
+                     <Row className="mb-3">
+                        <Form.Group as={Col} controlId="formCredName">
+                            <Form.Label>Credential Name*</Form.Label>
+                            <Form.Control
+                                type="text"
+                                name="credential_name"
+                                value={formData.credential_name}
+                                onChange={handleChange}
+                                required
+                                placeholder="e.g., MyRouter-Creds"
+                            />
+                        </Form.Group>
+                        <Form.Group as={Col} controlId="formCredSshUser">
+                            <Form.Label>SSH Username*</Form.Label>
+                            <Form.Control
+                                type="text"
+                                name="credential_ssh_username"
+                                value={formData.credential_ssh_username}
+                                onChange={handleChange}
+                                required
+                            />
+                        </Form.Group>
+                    </Row>
+                     <Form.Group className="mb-3" controlId="formCredAuthType">
+                        <Form.Label>Authentication Type*</Form.Label>
+                        <Form.Select
+                            name="credential_auth_type"
+                            value={formData.credential_auth_type}
+                            onChange={handleChange}
+                            required
+                        >
+                            <option value="password">Password</option>
+                            <option value="key">Private Key</option>
+                        </Form.Select>
+                    </Form.Group>
+
+                    {formData.credential_auth_type === 'password' ? (
+                        <Form.Group className="mb-3" controlId="formCredPassword">
+                            <Form.Label>Password*</Form.Label>
+                            <Form.Control
+                                type="password"
+                                name="credential_password"
+                                value={formData.credential_password}
+                                onChange={handleChange}
+                                required
+                            />
+                        </Form.Group>
+                    ) : (
+                        <Form.Group className="mb-3" controlId="formCredPrivateKey">
+                            <Form.Label>Private Key*</Form.Label>
+                            <Form.Control
+                                as="textarea"
+                                name="credential_private_key"
+                                value={formData.credential_private_key}
+                                onChange={handleChange}
+                                rows={5}
+                                required
+                                placeholder="Paste private key here (e.g., -----BEGIN RSA PRIVATE KEY-----...)"
+                            />
+                        </Form.Group>
+                    )}
+                </>
+            )}
+
+            <div className="d-flex justify-content-end">
+                <Button variant="secondary" onClick={onCancel} className="me-2">
+                    Cancel
+                </Button>
+                 <Button variant="primary" type="submit">
+                    {isEditing ? 'Update Device' : 'Create Device'}
+                </Button>
             </div>
-            <button type="submit" style={{ marginRight: '10px' }}>
-                {initialDevice ? 'Update Device' : 'Create Device'}
-            </button>
-            <button type="button" onClick={onCancel}>
-                Cancel
-            </button>
-        </form>
+        </Form>
     );
 }
 

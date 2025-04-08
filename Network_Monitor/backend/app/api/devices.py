@@ -2,47 +2,93 @@ from flask import request, jsonify, url_for, current_app
 from flask_login import login_required
 from . import api
 from .. import db
-from ..models import Device
+from ..models import Device, Credential
 from sqlalchemy.exc import IntegrityError
 from ..services.controllers import get_device_controller
 import datetime
 
 @api.route('/devices', methods=['POST'])
+@login_required
 def create_device():
-    """Create a new device."""
+    """Create a new device and its required credential."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No input data provided"}), 400
 
+    # --- Device Fields (Required) --- #
     name = data.get('name')
     ip_address = data.get('ip_address')
+    description = data.get('description')
+    control_method = data.get('control_method', 'ssh')
 
-    if not name or not ip_address:
-        return jsonify({"error": "Missing required fields: name and ip_address"}), 400
+    # --- Credential Fields (Required) --- #
+    cred_name = data.get('credential_name')
+    cred_ssh_username = data.get('credential_ssh_username')
+    cred_auth_type = data.get('credential_auth_type') # 'password' or 'key'
+    cred_password = data.get('credential_password')
+    cred_private_key = data.get('credential_private_key')
 
+    # --- Validation (All fields now required) --- #
+    required_device_fields = {'name': name, 'ip_address': ip_address}
+    required_cred_fields = {'credential_name': cred_name, 'credential_ssh_username': cred_ssh_username, 'credential_auth_type': cred_auth_type}
+    
+    missing_fields = [k for k, v in required_device_fields.items() if not v]
+    missing_fields.extend([k for k, v in required_cred_fields.items() if not v])
+
+    if missing_fields:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
+
+    if cred_auth_type not in ['password', 'key']:
+        return jsonify({"error": "Invalid credential_auth_type. Must be 'password' or 'key'"}), 400
+    if cred_auth_type == 'password' and not cred_password:
+         return jsonify({"error": "Missing credential_password for password auth type"}), 400
+    if cred_auth_type == 'key' and not cred_private_key:
+         return jsonify({"error": "Missing credential_private_key for key auth type"}), 400
+
+    # --- Uniqueness Checks --- #
     if Device.query.filter_by(name=name).first():
          return jsonify({"error": f"Device with name '{name}' already exists"}), 409
     if Device.query.filter_by(ip_address=ip_address).first():
          return jsonify({"error": f"Device with IP address '{ip_address}' already exists"}), 409
+    if Credential.query.filter_by(name=cred_name).first():
+         return jsonify({"error": f"Credential with name '{cred_name}' already exists"}), 409
 
+    # --- Create Objects (within transaction) --- #
     device = Device(
         name=name,
         ip_address=ip_address,
-        description=data.get('description'),
-        control_method=data.get('control_method', 'ssh'),
-        # status will default to 'Unknown'
+        description=description,
+        control_method=control_method
     )
-    db.session.add(device)
+    credential = Credential(
+        name=cred_name,
+        ssh_username=cred_ssh_username,
+        auth_type=cred_auth_type
+    )
+    if cred_auth_type == 'password':
+        credential.password = cred_password
+    else:
+        credential.private_key = cred_private_key
+    
+    # Associate directly
+    device.credential = credential # This sets device.credential_id automatically on commit
+
     try:
+        # Add credential first due to potential FK constraint if device depended on it
+        # (though here device.credential handles the link)
+        db.session.add(credential) 
+        db.session.add(device)    
         db.session.commit()
     except IntegrityError as e:
         db.session.rollback()
+        current_app.logger.error(f"DB Integrity Error creating device {name}: {e}", exc_info=True)
         return jsonify({"error": "Database integrity error", "message": str(e)}), 500
     except Exception as e:
         db.session.rollback()
+        current_app.logger.error(f"Error creating device {name}: {e}", exc_info=True)
         return jsonify({"error": "Failed to create device", "message": str(e)}), 500
 
-    response = jsonify(device.to_dict())
+    response = jsonify(device.to_dict()) # to_dict should include credential info
     response.status_code = 201
     response.headers['Location'] = url_for('api.get_device', id=device.id)
     return response

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert, Button, Spinner, Table, Card, Badge, ButtonGroup, Form } from 'react-bootstrap';
+import { Alert, Button, Spinner, Table, Card, Badge } from 'react-bootstrap';
 import api from '../services/api';
 import DeviceForm from './DeviceForm';
 import ApplyUciModal from './ApplyUciModal';
@@ -7,14 +7,12 @@ import { PencilSquare, Trash, Key, CheckCircle, XCircle, ArrowRepeat, GearFill, 
 
 function DeviceList() {
     const [devices, setDevices] = useState([]);
-    const [credentials, setCredentials] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [editingDevice, setEditingDevice] = useState(null);
     const [actionError, setActionError] = useState(null);
     const [actionMessage, setActionMessage] = useState(null);
-    const [selectedCredential, setSelectedCredential] = useState({});
     const [verificationStatus, setVerificationStatus] = useState({});
     const [showUciModal, setShowUciModal] = useState(false);
     const [uciTargetDevice, setUciTargetDevice] = useState(null);
@@ -26,7 +24,7 @@ function DeviceList() {
     const fetchLogConfig = useCallback(async (deviceId, currentDevices) => {
         const device = currentDevices.find(d => d.id === deviceId);
          if (!device || !device.credential_id) {
-             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: false, error: 'No credential' } }));
+             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: false, error: 'No credential associated' } }));
              return;
          }
 
@@ -64,14 +62,10 @@ function DeviceList() {
         }
         setLoading(true);
 
-        Promise.all([
-            api.getDevices(),
-            api.getCredentials()
-        ])
-        .then(([devicesResponse, credentialsResponse]) => {
-            const fetchedDevices = devicesResponse.data || [];
+        api.getDevices()
+        .then(response => {
+            const fetchedDevices = response.data || [];
             setDevices(fetchedDevices);
-            setCredentials(credentialsResponse.data || []);
             setError(null);
 
             const initialLogStatus = {};
@@ -80,18 +74,14 @@ function DeviceList() {
                 if (device.credential_id) {
                    fetchLogConfig(device.id, fetchedDevices);
                 } else {
-                   initialLogStatus[device.id] = { loading: false, error: 'No credential associated' };
-                }
-                if (!selectedCredential[device.id]) {
-                    setSelectedCredential(prev => ({ ...prev, [device.id]: '' }));
+                   initialLogStatus[device.id] = { loading: false, error: 'Credential missing?' };
                 }
             });
             setLogConfigStatus(initialLogStatus);
-
         })
         .catch(err => {
-            console.error("Error fetching data:", err);
-            setError(err.response?.data?.error || err.message || 'Failed to fetch data');
+            console.error("Error fetching devices:", err);
+            setError(err.response?.data?.error || err.message || 'Failed to fetch devices');
         })
         .finally(() => {
             setLoading(false);
@@ -140,7 +130,7 @@ function DeviceList() {
 
     const handleDelete = (device) => {
         clearActionFeedback();
-        if (window.confirm(`Are you sure you want to delete device '${device.name}'? This cannot be undone.`)) {
+        if (window.confirm(`Are you sure you want to delete device '${device.name}' (and potentially its credential)? This cannot be undone.`)) {
             api.deleteDevice(device.id)
                 .then(() => {
                     setActionMessage(`Device '${device.name}' deleted successfully.`);
@@ -153,62 +143,21 @@ function DeviceList() {
         }
     };
 
-    const handleAssociate = (deviceId) => {
-        clearActionFeedback();
-        const credId = selectedCredential[deviceId];
-        if (!credId) {
-            setActionError("Please select a credential to associate.");
+    const handleVerify = (deviceId) => {
+        const device = devices.find(d => d.id === deviceId);
+        if (!device || !device.credential_id) {
+            setActionError("Cannot verify: Device or its credential missing.");
             return;
         }
-        api.associateCredential(deviceId, credId)
-            .then(response => {
-                setActionMessage(response.data.message || `Credential associated successfully.`);
-                setSelectedCredential(prev => ({...prev, [deviceId]: ''}));
-                fetchDevices();
-            })
-            .catch(err => {
-                 console.error("Error associating credential:", err);
-                 setActionError(err.response?.data?.error || err.message || 'Failed to associate credential');
-            });
-    };
+        const credentialId = device.credential_id;
 
-    const handleDisassociate = (deviceId, credentialName) => {
         clearActionFeedback();
-        if (window.confirm(`Disassociate credential '${credentialName}' from this device?`)) {
-            api.disassociateCredential(deviceId)
-                .then(response => {
-                    setActionMessage(response.data.message || `Credential disassociated successfully.`);
-                    fetchDevices();
-                })
-                .catch(err => {
-                    console.error("Error disassociating credential:", err);
-                    setActionError(err.response?.data?.error || err.message || 'Failed to disassociate credential');
-                });
-        }
-    };
-
-    const handleCredentialSelectChange = (deviceId, event) => {
-        setSelectedCredential(prev => ({
-            ...prev,
-            [deviceId]: event.target.value
-        }));
-        const device = devices.find(d => d.id === deviceId);
-        if (device && device.credential_id) {
-            setVerificationStatus(prev => {
-                 const newStatus = { ...prev };
-                 delete newStatus[device.credential_id];
-                 return newStatus;
-             });
-        }
-    };
-
-    const handleVerify = (credentialId) => {
-        clearActionFeedback();
-         setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'loading', message: 'Verifying...' } }));
+        setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'loading', message: 'Verifying...' } }));
 
         api.verifyCredential(credentialId)
             .then(response => {
                 setVerificationStatus(prev => ({ ...prev, [credentialId]: { status: 'success', message: response.data.message || 'Verification Successful' } }));
+                refreshDevice(device.id, false);
             })
             .catch(err => {
                  console.error("Error verifying credential:", err);
@@ -220,7 +169,7 @@ function DeviceList() {
     const openUciModal = (device) => {
         if (!device.credential_id) {
             clearActionFeedback();
-            setActionError("Cannot apply UCI: Device has no associated credential.");
+            setActionError("Cannot apply UCI: Device has no credential.");
             return;
         }
         clearActionFeedback();
@@ -338,8 +287,8 @@ function DeviceList() {
     };
 
     const getCredentialName = (id) => {
-        const cred = credentials.find(c => c.id === id);
-        return cred ? cred.name : 'N/A';
+        const cred = devices.find(d => d.credential_id === id);
+        return cred ? cred.credential.name : 'N/A';
     };
 
     const renderVerificationStatus = (credId) => {
@@ -382,6 +331,23 @@ function DeviceList() {
             </>
         );
     };
+
+    const refreshDevice = useCallback((deviceId, clearFeedback = true) => {
+        if (clearFeedback) clearActionFeedback();
+        setRefreshingDevice(deviceId);
+        api.refreshDeviceStatus(deviceId)
+            .then(response => {
+                if (clearFeedback) setActionMessage(response.data.message || 'Device status refreshed.');
+                fetchDevices(false);
+            })
+            .catch(err => {
+                console.error(`Error refreshing device ${deviceId}:`, err);
+                if (clearFeedback) setActionError(err.response?.data?.error || err.message || 'Failed to refresh status');
+            })
+            .finally(() => {
+                setRefreshingDevice(null);
+            });
+    }, [fetchDevices]);
 
     if (loading && devices.length === 0) {
         return (
@@ -469,37 +435,13 @@ function DeviceList() {
                                          {device.credential_id ? (
                                              <div className="d-flex align-items-center">
                                                  <span>{getCredentialName(device.credential_id)}</span>
-                                                 <Button variant="link" size="sm" onClick={() => handleVerify(device.credential_id)} className="p-0 ms-1" title="Verify SSH Connection">
+                                                 <Button variant="link" size="sm" onClick={() => handleVerify(device.id)} className="p-0 ms-1" title="Verify SSH Connection">
                                                      <Key />
                                                  </Button>
                                                  {renderVerificationStatus(device.credential_id)}
-                                                 <Button variant="outline-danger" size="sm" className="ms-2" onClick={() => handleDisassociate(device.id, getCredentialName(device.credential_id))} title="Disassociate Credential">
-                                                     <XCircle />
-                                                 </Button>
                                              </div>
                                          ) : (
-                                             <div className="d-flex align-items-center">
-                                                 <Form.Select
-                                                     size="sm"
-                                                     value={selectedCredential[device.id] || ''}
-                                                     onChange={(e) => handleCredentialSelectChange(device.id, e)}
-                                                     className="me-2"
-                                                     style={{ maxWidth: '150px' }}
-                                                 >
-                                                     <option value="">Select Credential...</option>
-                                                     {credentials.map(cred => (
-                                                         <option key={cred.id} value={cred.id}>{cred.name}</option>
-                                                     ))}
-                                                 </Form.Select>
-                                                 <Button
-                                                      variant="outline-primary"
-                                                      size="sm"
-                                                      onClick={() => handleAssociate(device.id)}
-                                                      disabled={!selectedCredential[device.id]}
-                                                  >
-                                                      Associate
-                                                  </Button>
-                                             </div>
+                                             <Badge bg="warning">None</Badge>
                                          )}
                                      </td>
                                      <td>

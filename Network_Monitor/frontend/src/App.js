@@ -72,9 +72,6 @@ function App() {
                             <Nav.Link as={NavLink} to="/devices" style={navLinkStyle} end>
                                 <HouseDoorFill style={IconStyle} /> Devices
                             </Nav.Link>
-                            <Nav.Link as={NavLink} to="/credentials" style={navLinkStyle}>
-                                <KeyFill style={IconStyle} /> Credentials
-                            </Nav.Link>
                             <Nav.Link as={NavLink} to="/logs" style={navLinkStyle}>
                                 <FileEarmarkTextFill style={IconStyle} /> Logs
                             </Nav.Link>
@@ -85,7 +82,6 @@ function App() {
                         <Routes>
                             <Route path="/dashboard" element={<Dashboard />} />
                             <Route path="/devices" element={<DeviceList />} />
-                            <Route path="/credentials" element={<CredentialList />} />
                             <Route path="/logs" element={<LogList />} />
                             <Route path="/" element={<Navigate replace to="/dashboard" />} />
                             <Route path="*" element={<Navigate replace to="/dashboard" />} />
