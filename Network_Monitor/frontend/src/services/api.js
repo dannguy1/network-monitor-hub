@@ -38,9 +38,9 @@ apiClient.interceptors.response.use(
 );
 
 // --- Authentication --- //
-const login = (username, password) => apiClient.post('/auth/login', { username, password });
+const login = (data) => apiClient.post('/auth/login', data);
 const logout = () => apiClient.post('/auth/logout');
-const checkAuth = () => apiClient.get('/auth/check'); // Endpoint to verify session
+const checkAuthStatus = () => apiClient.get('/auth/status'); // Renamed for clarity?
 const createUser = (username, password) => apiClient.post('/auth/create-user', { username, password }); // Admin only usually
 
 // --- Devices --- //
@@ -77,7 +77,7 @@ const getDashboardSummary = () => apiClient.get('/dashboard/summary'); // New
 const api = {
     login,
     logout,
-    checkAuth,
+    checkAuthStatus,
     createUser,
     getDevices,
     getDevice,
