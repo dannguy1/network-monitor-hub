@@ -22,6 +22,41 @@ function DeviceList() {
     const [rebootingDevice, setRebootingDevice] = useState(null);
     const [refreshingDevice, setRefreshingDevice] = useState(null);
 
+    // --- Define fetchLogConfig first --- //
+    const fetchLogConfig = useCallback(async (deviceId, currentDevices) => {
+        const device = currentDevices.find(d => d.id === deviceId);
+         if (!device || !device.credential_id) {
+             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: false, error: 'No credential' } }));
+             return;
+         }
+
+        setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...prev[deviceId], loading: true, error: null } }));
+        try {
+            const response = await api.getLogConfig(deviceId);
+            setLogConfigStatus(prev => ({
+                ...prev,
+                [deviceId]: {
+                    loading: false,
+                    enabled: response.data.remote_logging_enabled,
+                    target: response.data.remote_log_target,
+                    error: null
+                }
+            }));
+        } catch (err) {
+            console.error(`Error fetching log config for device ${deviceId}:`, err);
+             const errMsg = err.response?.data?.error || err.message || 'Failed to fetch status';
+             setLogConfigStatus(prev => ({
+                ...prev,
+                [deviceId]: {
+                     ...(prev[deviceId] || {}),
+                    loading: false,
+                    error: errMsg
+                }
+            }));
+        }
+    }, []); // Dependency array for fetchLogConfig (currently empty, adjust if needed)
+    // --- End fetchLogConfig definition ---
+
     const fetchDevices = useCallback((clearActionFeedback = true) => {
         if (clearActionFeedback) {
             setActionError(null);
@@ -61,11 +96,11 @@ function DeviceList() {
         .finally(() => {
             setLoading(false);
         });
-    }, [selectedCredential]);
+    }, [selectedCredential, fetchLogConfig]); // fetchLogConfig dependency is now valid
 
     useEffect(() => {
         fetchDevices(true);
-    }, []);
+    }, [fetchDevices]);
 
     const clearActionFeedback = () => {
         setActionError(null);
@@ -221,39 +256,6 @@ function DeviceList() {
         setShowUciModal(false);
         setUciTargetDevice(null);
     };
-
-    const fetchLogConfig = useCallback(async (deviceId, currentDevices) => {
-        const device = currentDevices.find(d => d.id === deviceId);
-         if (!device || !device.credential_id) {
-             setLogConfigStatus(prev => ({ ...prev, [deviceId]: { loading: false, error: 'No credential' } }));
-             return;
-         }
-
-        setLogConfigStatus(prev => ({ ...prev, [deviceId]: { ...prev[deviceId], loading: true, error: null } }));
-        try {
-            const response = await api.getLogConfig(deviceId);
-            setLogConfigStatus(prev => ({
-                ...prev,
-                [deviceId]: {
-                    loading: false,
-                    enabled: response.data.remote_logging_enabled,
-                    target: response.data.remote_log_target,
-                    error: null
-                }
-            }));
-        } catch (err) {
-            console.error(`Error fetching log config for device ${deviceId}:`, err);
-             const errMsg = err.response?.data?.error || err.message || 'Failed to fetch status';
-             setLogConfigStatus(prev => ({
-                ...prev,
-                [deviceId]: {
-                     ...(prev[deviceId] || {}),
-                    loading: false,
-                     error: errMsg
-                }
-            }));
-        }
-    }, []);
 
     const handleToggleLogConfig = async (deviceId, currentState) => {
         clearActionFeedback();
