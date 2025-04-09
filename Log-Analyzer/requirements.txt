@@ -1,0 +1,17 @@
+# Core dependencies
+PyYAML>=6.0
+paho-mqtt>=1.6.1 # For MQTT message queue ingestion
+
+# Web UI dependencies
+Flask>=2.2 # For configuration UI
+Flask-Login>=0.6 # For session-based authentication
+waitress>=2.1 # Production WSGI server for Flask
+ruamel.yaml>=0.17 # For preserving comments/structure in config write
+Werkzeug>=2.2 # For password hashing
+
+# Monitoring dependencies
+prometheus-client>=0.14 # For exposing metrics
+
+# Testing dependencies
+pytest>=7.0
+pytest-cov>=3.0 # For coverage reporting

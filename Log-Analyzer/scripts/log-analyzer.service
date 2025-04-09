@@ -1,0 +1,28 @@
+[Unit]
+Description=Log Analyzer Service
+After=network.target
+
+[Service]
+User=loganalyzer # TODO: Create a dedicated user
+Group=loganalyzer # TODO: Create a dedicated group
+WorkingDirectory=/opt/log-analyzer # TODO: Adjust installation path
+Environment="PYTHONUNBUFFERED=1"
+# Environment="CONFIG_PATH=/etc/log-analyzer/config.yaml" # Optional: Set config path via env
+
+# Option 1: Running directly using installed script (adjust path if needed)
+# ExecStart=/usr/local/bin/log-analyzer -c /etc/log-analyzer/config.yaml
+
+# Option 2: Running using python and module path (adjust paths if needed)
+ExecStart=/usr/bin/python3 -m log_analyzer.main -c /etc/log-analyzer/config.yaml
+
+Restart=on-failure
+RestartSec=5
+
+# Security hardening (adjust as needed)
+# PrivateTmp=true
+# ProtectSystem=full
+# ProtectHome=true
+# NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target 

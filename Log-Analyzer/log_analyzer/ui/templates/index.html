@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Log Analyzer Status</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        h1, h2 { color: #333; }
+        pre { background-color: #f4f4f4; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }
+        .status-item { margin-bottom: 10px; }
+        .status-label { font-weight: bold; }
+        #api-status { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-sm navbar-light bg-light mb-3">
+        <div class="container-fluid">
+            <span class="navbar-brand">Log Analyzer</span>
+            <div class="navbar-nav ms-auto">
+                {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Logout ({{ current_user.id }})</a>
+                    </li>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Log Analyzer Status</h1>
+
+        <div class="mb-3">
+            <a href="{{ url_for('edit_config') }}" class="btn btn-secondary">Edit Configuration</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <h2>Component Status</h2>
+        <div class="status-item"><span class="status-label">MQTT Ingestion:</span> {{ status.get('mqtt_ingestion', 'Unknown') }}</div>
+        <div class="status-item"><span class="status-label">Parser:</span> {{ status.get('parser', 'Unknown') }}</div>
+        <div class="status-item"><span class="status-label">Analysis Manager:</span> {{ status.get('analysis_manager', 'Unknown') }}</div>
+        <div class="status-item"><span class="status-label">Command Publisher:</span> {{ status.get('command_publisher', 'Unknown') }}</div>
+
+        <h2>API Status (/api/status)</h2>
+        <pre id="api-status">Loading...</pre>
+
+        <h2>Configuration (/config)</h2>
+        <pre id="config-view">Loading...</pre>
+
+        <script>
+            // Fetch API status
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('api-status').textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(error => {
+                    document.getElementById('api-status').textContent = 'Error loading API status: ' + error;
+                });
+
+            // Fetch Config
+            fetch('/config')
+                .then(response => response.json())
+                .then(data => {
+                    // Basic masking attempt (replace with proper server-side masking)
+                    const maskedData = JSON.stringify(data, (key, value) => {
+                        if (key.toLowerCase().includes('password') || key.toLowerCase().includes('secret')) {
+                            return '********';
+                        }
+                        return value;
+                    }, 2);
+                    document.getElementById('config-view').textContent = maskedData;
+                })
+                .catch(error => {
+                    document.getElementById('config-view').textContent = 'Error loading configuration: ' + error;
+                });
+        </script>
+    </div> <!-- Close container -->
+</body>
+</html> 
