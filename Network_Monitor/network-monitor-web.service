@@ -15,7 +15,7 @@ Environment="FLASK_CONFIG=production"
 ExecStart=/opt/openwrt-loghub/venv/bin/gunicorn \
     --workers 3 \
     --bind unix:/tmp/network-monitor.sock \
-    -m 007 \
+    # -m 0660 # Leave commented out as default permissions work reliably
     wsgi:app
 
 Restart=always

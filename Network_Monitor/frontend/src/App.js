@@ -12,8 +12,9 @@ import Dashboard from './components/Dashboard';
 import DeviceList from './components/DeviceList';
 import LogList from './components/LogList';
 import Login from './components/Login';
+import ChangePassword from './components/ChangePassword';
 import { useAuth } from './context/AuthContext';
-import { Speedometer2, HouseDoorFill, FileEarmarkTextFill } from 'react-bootstrap-icons';
+import { Speedometer2, HouseDoorFill, FileEarmarkTextFill, GearFill } from 'react-bootstrap-icons';
 
 function App() {
     const { currentUser, loadingAuth, logout } = useAuth();
@@ -74,6 +75,9 @@ function App() {
                             <Nav.Link as={NavLink} to="/logs" style={navLinkStyle}>
                                 <FileEarmarkTextFill style={IconStyle} /> Logs
                             </Nav.Link>
+                            <Nav.Link as={NavLink} to="/change-password" style={navLinkStyle}>
+                                <GearFill style={IconStyle} /> Settings
+                            </Nav.Link>
                         </Nav>
                     </Col>
 
@@ -82,6 +86,7 @@ function App() {
                             <Route path="/dashboard" element={<Dashboard />} />
                             <Route path="/devices" element={<DeviceList />} />
                             <Route path="/logs" element={<LogList />} />
+                            <Route path="/change-password" element={<ChangePassword />} />
                             <Route path="/" element={<Navigate replace to="/dashboard" />} />
                             <Route path="*" element={<Navigate replace to="/dashboard" />} />
                         </Routes>
