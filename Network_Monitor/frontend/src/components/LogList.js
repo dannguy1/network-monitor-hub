@@ -18,6 +18,7 @@ function LogList() {
     const [filterDeviceId, setFilterDeviceId] = useState('');
     const [filterLogLevel, setFilterLogLevel] = useState('');
     const [filterMessage, setFilterMessage] = useState('');
+    const [filterProcessName, setFilterProcessName] = useState('');
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
     // Active filters sent to API
@@ -68,6 +69,7 @@ function LogList() {
         if (filterDeviceId) newFilters.device_id = filterDeviceId;
         if (filterLogLevel) newFilters.log_level = filterLogLevel;
         if (filterMessage) newFilters.message_contains = filterMessage;
+        if (filterProcessName) newFilters.process_name = filterProcessName;
         if (filterStartDate) newFilters.start_date = filterStartDate;
         if (filterEndDate) newFilters.end_date = filterEndDate;
 
@@ -79,6 +81,7 @@ function LogList() {
         setFilterDeviceId('');
         setFilterLogLevel('');
         setFilterMessage('');
+        setFilterProcessName('');
         setFilterStartDate('');
         setFilterEndDate('');
         setActiveFilters({});
@@ -232,7 +235,18 @@ function LogList() {
                                  </Form.Select>
                             </Form.Group>
                          </Col>
-                         <Col md={4}>
+                         <Col md={2}>
+                             <Form.Group controlId="filterProcessName">
+                                 <Form.Label>Process Name</Form.Label>
+                                 <Form.Control
+                                     type="text"
+                                     placeholder="e.g., cron, kernel"
+                                     value={filterProcessName}
+                                     onChange={(e) => setFilterProcessName(e.target.value)}
+                                 />
+                             </Form.Group>
+                         </Col>
+                         <Col md={3}>
                              <Form.Group controlId="filterMessage">
                                  <Form.Label>Message Contains</Form.Label>
                                  <Form.Control
