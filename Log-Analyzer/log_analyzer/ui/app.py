@@ -9,12 +9,23 @@ import os
 # --- New Imports for Auth ---
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
+# --- Add Flask-WTF imports ---
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired
 # ---------------------------
 
 logger = logging.getLogger(__name__)
 
 # --- Authentication Setup --- #
 login_manager = LoginManager()
+
+# --- Add LoginForm Definition ---
+class LoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Login')
+# ----------------------------
 
 class User(UserMixin):
     """Simple User class for Flask-Login."""
@@ -128,20 +139,24 @@ def create_app(initial_config: Dict[str, Any],
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        if request.method == 'POST':
-            username = request.form.get('username')
-            password = request.form.get('password')
+        form = LoginForm() # Create form instance
+        if form.validate_on_submit(): # Handles POST and validation
+            username = form.username.data
+            password = form.password.data
             user = load_user(username) # Attempt to load our single user
 
             if user and user.verify_password(password):
                 login_user(user) # Log in the user via Flask-Login
                 flash('Logged in successfully.', 'success')
                 next_page = request.args.get('next')
-                # TODO: Validate next_page URL
+                # TODO: Validate next_page URL more robustly
+                if next_page and not next_page.startswith('/'): # Basic security check
+                    next_page = url_for('index')
                 return redirect(next_page or url_for('index'))
             else:
                 flash('Invalid username or password', 'danger')
-        return render_template('login.html')
+        # For GET request or if validation fails, render template with form
+        return render_template('login.html', form=form)
 
     @app.route('/logout')
     @login_required
