@@ -111,13 +111,6 @@ def create_app(initial_config: Dict[str, Any],
     yaml = YAML()
     yaml.preserve_quotes = True
 
-    @app.before_request
-    def before_request_auth():
-        # Apply auth to all routes for now
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
-
     # --- Helper to get current status ---
     def get_status_dict() -> Dict[str, Any]:
         return {
