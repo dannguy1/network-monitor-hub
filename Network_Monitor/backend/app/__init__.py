@@ -39,6 +39,15 @@ def get_cipher_suite():
 # --- End Encryption Setup ---
 
 def create_app(config_name=None):
+    # --- Explicitly load .env VERY early --- #
+    # This ensures environment variables are set before config object is loaded
+    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) # /backend
+    dotenv_path = os.path.join(basedir, '..', '.env') # /Network_Monitor/.env
+    # Use load_dotenv directly, override ensures .env takes precedence over system env vars if needed
+    loaded = load_dotenv(dotenv_path, override=True) 
+    print(f"DEBUG: Attempted early load of .env from: {dotenv_path}. Loaded: {loaded}")
+    # --- End early load ---
+
     if config_name is None:
         config_name = os.getenv('FLASK_CONFIG', 'default')
 
@@ -66,12 +75,12 @@ def create_app(config_name=None):
         print("Scheduler already running.")
 
     # Setup CORS properly
-    # --- Add explicit dotenv load here for debugging --- #
-    basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) # Should be /backend
-    dotenv_path = os.path.join(basedir, '..', '.env') # Go up one more level to Network_Monitor/.env
-    load_dotenv(dotenv_path, override=True) # Override existing env vars if needed
-    print(f"DEBUG: Explicitly loaded .env from: {dotenv_path}")
-    # --- End explicit load --- #
+    # --- REMOVE redundant dotenv load here --- #
+    # basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) # Should be /backend
+    # dotenv_path = os.path.join(basedir, '..', '.env') # Go up one more level to Network_Monitor/.env
+    # load_dotenv(dotenv_path, override=True) # Override existing env vars if needed
+    # print(f"DEBUG: Explicitly loaded .env from: {dotenv_path}")
+    # --- End redundant load --- #
 
     # Allow requests from the frontend origin (adjust in production)
     # Read directly from os.environ after loading .env

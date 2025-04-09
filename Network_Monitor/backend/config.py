@@ -4,11 +4,12 @@ from cryptography.fernet import Fernet
 
 # Load environment variables from .env file
 basedir = os.path.abspath(os.path.dirname(__file__))
-dotenv_path = os.path.join(basedir, '..', '.env') # Point to .env in the Network_Monitor root
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
-else:
-    print("Warning: .env file not found. Using default or environment-provided settings.")
+# REMOVE initial dotenv loading - let create_app handle it reliably.
+# dotenv_path = os.path.join(basedir, '..', '.env') 
+# if os.path.exists(dotenv_path):
+#     load_dotenv(dotenv_path)
+# else:
+#     print("Warning: .env file not found. Using default or environment-provided settings.")
 
 
 class Config:
@@ -25,11 +26,13 @@ class Config:
     AI_ENGINE_API_KEY = os.environ.get('AI_ENGINE_API_KEY')
     AI_PUSH_INTERVAL_MINUTES = int(os.environ.get('AI_PUSH_INTERVAL_MINUTES', '10')) # Default 10 mins
 
-    # Syslog configuration (Example: path if reading from file)
-    SYSLOG_FILE_PATH = os.environ.get('SYSLOG_FILE_PATH', '/var/log/openwrt-devices.log')
+    # Syslog Server (Built-in) Configuration
+    SYSLOG_UDP_PORT = os.environ.get('SYSLOG_UDP_PORT')
+    # SYSLOG_FILE_PATH = os.environ.get('SYSLOG_FILE_PATH', '/var/log/openwrt-devices.log') # Keep if needed for file processing
 
     # Add other configurations as needed
-    # e.g., SSH connection timeouts, log rotation settings, etc.
+    SSH_TIMEOUT = int(os.environ.get('SSH_TIMEOUT', '10'))
+    FRONTEND_ORIGIN = os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000')
 
     @staticmethod
     def init_app(app):
@@ -41,10 +44,12 @@ class Config:
              # For Fernet, it must be a URL-safe base64-encoded 32-byte key.
              pass # Add a check for Fernet key format if using cryptography.fernet
 
-        print(f"Database URI: {Config.SQLALCHEMY_DATABASE_URI}")
-        print(f"AI Engine Endpoint: {Config.AI_ENGINE_ENDPOINT}")
-        print(f"AI Push Interval: {Config.AI_PUSH_INTERVAL_MINUTES} minutes")
-        print(f"Syslog File Path: {Config.SYSLOG_FILE_PATH}")
+        print(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
+        print(f"AI Engine Endpoint: {app.config.get('AI_ENGINE_ENDPOINT')}")
+        print(f"AI Push Interval: {app.config.get('AI_PUSH_INTERVAL_MINUTES')} minutes")
+        print(f"Syslog UDP Port: {app.config.get('SYSLOG_UDP_PORT')}")
+        print(f"SSH Timeout: {app.config.get('SSH_TIMEOUT')}")
+        print(f"Frontend Origin: {app.config.get('FRONTEND_ORIGIN')}")
 
 
 # You could define different configs for development, testing, production

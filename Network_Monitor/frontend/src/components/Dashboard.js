@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Spinner, Alert } from 'react-bootstrap';
-import { Wifi, FileEarmarkMedicalFill, ExclamationTriangleFill } from 'react-bootstrap-icons'; // Removed WifiOff
+import { Card, Row, Col, Spinner, Alert, Badge } from 'react-bootstrap';
+import { Wifi, FileEarmarkMedicalFill, ExclamationTriangleFill, Server, CloudArrowUpFill } from 'react-bootstrap-icons'; // Removed WifiOff
 import api from '../services/api'; // We will need this later
 
 function Dashboard() {
@@ -25,6 +25,20 @@ function Dashboard() {
             });
 
     }, []); // Empty dependency array means this runs once on mount
+
+    const getStatusBadge = (status) => {
+        if (!status) return <Badge bg="secondary">Unknown</Badge>;
+        const lowerStatus = status.toLowerCase();
+        if (lowerStatus.includes('running') || lowerStatus.includes('scheduled')) {
+            return <Badge bg="success">{status}</Badge>;
+        } else if (lowerStatus.includes('stopped') || lowerStatus.includes('disabled') || lowerStatus.includes('inactive')) {
+            return <Badge bg="warning" text="dark">{status}</Badge>;
+        } else if (lowerStatus.includes('error')) {
+            return <Badge bg="danger">{status}</Badge>;
+        } else {
+            return <Badge bg="secondary">{status}</Badge>; // Default for Unknown, Check Error etc.
+        }
+    };
 
     if (loading) {
         return (
@@ -71,15 +85,27 @@ function Dashboard() {
                      </Card>
                  </Col>
 
-                {/* Placeholder for another card - e.g., System Status or Notifications */}
+                {/* System Status Card */}
                  <Col md={6} lg={4}>
                     <Card bg="light">
                         <Card.Body>
                             <Card.Title><ExclamationTriangleFill className="me-2" /> System Status</Card.Title>
-                             {/* These are just illustrative - a real endpoint would be needed */}
-                            <p>Backend API: {error ? <span className="text-danger">Error</span> : <span className="text-success">Running</span>}</p>
-                            <p>Syslog Listener: <span className="text-secondary">Unknown</span></p>
-                            <p>AI Push Task: <span className="text-secondary">Unknown</span></p>
+                            {/* Add simple API status indicator */}
+                            <Row className="mb-2">
+                                <Col xs={8}><span className="text-primary">&#9889;</span> Backend API:</Col> 
+                                <Col xs={4} className="text-end">
+                                    {/* If we have data, API is responding */}
+                                    {summaryData ? <Badge bg="success">Running</Badge> : <Badge bg="danger">Error</Badge>}
+                                </Col>
+                            </Row>
+                            <Row className="mb-2">
+                                <Col xs={8}><Server className="me-1" /> Syslog Listener:</Col>
+                                <Col xs={4} className="text-end">{getStatusBadge(summaryData?.syslog_listener_status)}</Col>
+                            </Row>
+                            <Row>
+                                <Col xs={8}><CloudArrowUpFill className="me-1" /> AI Pusher:</Col>
+                                <Col xs={4} className="text-end">{getStatusBadge(summaryData?.ai_pusher_status)}</Col>
+                            </Row>
                             {/* Add more relevant status info here */}
                         </Card.Body>
                     </Card>
