@@ -194,10 +194,55 @@ def create_user_command(username, password):
     db.session.commit()
     click.echo(f'User "{username}" created successfully.')
 
+@click.command('seed-admin')
+@with_appcontext
+def seed_admin_command():
+    """Creates the default 'admin' user with password 'admin' if it doesn't exist."""
+    from .models import User
+    from . import db
+    username = 'admin'
+    password = 'admin' # Default password
+    if User.query.filter_by(username=username).first():
+        click.echo(f'User "{username}" already exists. Skipping seed.')
+        return
+    
+    user = User(username=username, password=password)
+    db.session.add(user)
+    try:
+        db.session.commit()
+        click.echo(f'Default user "{username}" created successfully.')
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f'Error creating default user "{username}": {e}', err=True)
+
+@click.command('set-password')
+@click.argument('username')
+@click.password_option(confirmation_prompt=False) # Prompt only once
+@with_appcontext
+def set_password_command(username, password):
+    """Sets or resets the password for an existing user."""
+    from .models import User
+    from . import db
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        click.echo(f'Error: User "{username}" not found.', err=True)
+        return
+
+    # Use the model's password setter to hash the new password
+    user.password = password 
+    try:
+        db.session.commit()
+        click.echo(f'Password for user "{username}" updated successfully.')
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f'Error updating password for user "{username}": {e}', err=True)
+
 def register(app):
     """Register CLI commands with the Flask app."""
     app.cli.add_command(run_syslog_command)
     app.cli.add_command(trigger_ai_push_command)
     app.cli.add_command(process_log_file_command)
-    app.cli.add_command(create_user_command) # Register create-user
+    app.cli.add_command(create_user_command)
+    app.cli.add_command(seed_admin_command)
+    app.cli.add_command(set_password_command) # Add the set-password command
     app.logger.info("Registered custom CLI commands.") 

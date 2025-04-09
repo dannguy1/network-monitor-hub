@@ -42,6 +42,7 @@ const login = (data) => apiClient.post('/auth/login', data);
 const logout = () => apiClient.post('/auth/logout');
 const checkAuthStatus = () => apiClient.get('/auth/status'); // Renamed for clarity?
 const createUser = (username, password) => apiClient.post('/auth/create-user', { username, password }); // Admin only usually
+const changePassword = (currentPassword, newPassword) => apiClient.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword });
 
 // --- Devices --- //
 const getDevices = () => apiClient.get('/devices');
@@ -99,7 +100,8 @@ const api = {
     getLogs,
     applyUciToDevice,
     getDashboardSummary, // Export new function
-    deleteAllLogs
+    deleteAllLogs,
+    changePassword
 };
 
 export default api; 

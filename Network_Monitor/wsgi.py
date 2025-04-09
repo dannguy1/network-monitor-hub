@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 
 # Ensure .env is loaded before creating the app, especially for FLASK_CONFIG
@@ -8,7 +9,16 @@ if os.path.exists(dotenv_path):
 else:
     print("Warning: .env file not found in project root for wsgi.")
 
-from app import create_app # Corrected import path
+# Add the backend directory to sys.path if wsgi.py is in the root
+# Adjust this based on your actual project structure
+project_root = os.path.dirname(__file__) 
+backend_path = os.path.join(project_root, 'backend')
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
+
+# Use correct import path assuming wsgi.py is in project root
+# and app package is inside 'backend'
+from backend.app import create_app 
 
 # Determine the config name (e.g., 'development', 'production')
 config_name = os.getenv('FLASK_CONFIG', 'production') # Default to production for wsgi

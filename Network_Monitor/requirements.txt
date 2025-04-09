@@ -1,7 +1,8 @@
 Flask
 Flask-SQLAlchemy
 Flask-Migrate
-# psycopg2-binary # Or mysqlclient if using MySQL - Removed for SQLite
+psycopg2-binary # Driver for PostgreSQL
+# Or mysqlclient if using MySQL - Removed for SQLite
 python-dotenv
 gunicorn
 cryptography

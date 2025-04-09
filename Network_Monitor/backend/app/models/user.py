@@ -7,7 +7,8 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, index=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    # Increase length to accommodate modern hashes (e.g., scrypt)
+    password_hash = db.Column(db.String(256))
     # Add other user fields if needed (email, name, roles etc.)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
