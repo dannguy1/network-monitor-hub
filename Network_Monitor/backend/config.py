@@ -30,6 +30,19 @@ class Config:
     SYSLOG_UDP_PORT = os.environ.get('SYSLOG_UDP_PORT')
     # SYSLOG_FILE_PATH = os.environ.get('SYSLOG_FILE_PATH', '/var/log/openwrt-devices.log') # Keep if needed for file processing
 
+    # --- Log Analyzer Integration (MQTT) --- #
+    LOG_ANALYZER_MQTT_ENABLED = os.environ.get('LOG_ANALYZER_MQTT_ENABLED', 'false').lower() == 'true'
+    LOG_ANALYZER_MQTT_HOST = os.environ.get('LOG_ANALYZER_MQTT_HOST', 'localhost')
+    LOG_ANALYZER_MQTT_PORT = int(os.environ.get('LOG_ANALYZER_MQTT_PORT', '1883'))
+    # Base topic prefix where Log Analyzer ingests logs (e.g., network_monitor/logs)
+    LOG_ANALYZER_MQTT_TOPIC_PREFIX = os.environ.get('LOG_ANALYZER_MQTT_TOPIC_PREFIX', 'network_monitor/logs')
+    LOG_ANALYZER_MQTT_USERNAME = os.environ.get('LOG_ANALYZER_MQTT_USERNAME') # Optional
+    LOG_ANALYZER_MQTT_PASSWORD = os.environ.get('LOG_ANALYZER_MQTT_PASSWORD') # Optional
+    LOG_ANALYZER_MQTT_USE_TLS = os.environ.get('LOG_ANALYZER_MQTT_USE_TLS', 'false').lower() == 'true'
+    LOG_ANALYZER_MQTT_TLS_CA_CERTS = os.environ.get('LOG_ANALYZER_MQTT_TLS_CA_CERTS') # Path to CA certs if needed
+    LOG_ANALYZER_MQTT_QOS = int(os.environ.get('LOG_ANALYZER_MQTT_QOS', '1'))
+    LOG_ANALYZER_MQTT_CLIENT_ID = os.environ.get('LOG_ANALYZER_MQTT_CLIENT_ID', 'network_monitor_pusher')
+
     # Add other configurations as needed
     SSH_TIMEOUT = int(os.environ.get('SSH_TIMEOUT', '10'))
     FRONTEND_ORIGIN = os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000')

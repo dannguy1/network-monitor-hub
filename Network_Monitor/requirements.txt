@@ -15,4 +15,5 @@ pytest-flask
 Flask-Login
 Werkzeug
 Flask-Limiter
-Flask-Cors 
+Flask-Cors
+paho-mqtt>=1.6.1 # For pushing logs to Log-Analyzer via MQTT 
