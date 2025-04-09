@@ -4,18 +4,19 @@ After=network.target network-monitor-web.service # Ensure web service is potenti
 Requires=network-monitor-web.service # Or adjust depending on dependencies
 
 [Service]
-User=root # Required for privileged port 514, or change port and user
-Group=nogroup
-WorkingDirectory=/opt/openwrt-loghub # Adjust path as needed
-Environment="PATH=/opt/openwrt-loghub/venv/bin"
-Environment="FLASK_APP=wsgi.py"
+User=netmonitor
+Group=netmonitor
+WorkingDirectory=/opt/network-monitor # Corrected
+Environment="PATH=/opt/network-monitor/backend/venv/bin" # Corrected
+Environment="FLASK_APP=backend.app:create_app" # Corrected
 Environment="FLASK_CONFIG=production"
+EnvironmentFile=/opt/network-monitor/.env # Ensure .env is loaded
 
 # Note: Running Flask development server is NOT recommended for production.
 # Consider a more robust UDP server implementation if needed.
-# This uses the custom Flask CLI command.
-# Adjust port if not using 514.
-ExecStart=/opt/openwrt-loghub/venv/bin/flask run-syslog --port 514
+# This uses the custom Flask CLI command 'run-syslog'
+# Port is determined from SYSLOG_UDP_PORT in .env (loaded via EnvironmentFile)
+ExecStart=/opt/network-monitor/backend/venv/bin/flask run-syslog # Corrected path, removed hardcoded port
 
 Restart=always
 

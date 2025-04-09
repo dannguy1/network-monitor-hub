@@ -32,28 +32,43 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
 def run_syslog_command(host, port):
     """Runs the UDP syslog listener server."""
     from flask import current_app
-    current_app.logger.info(f"Attempting to start UDP Syslog server on {host}:{port}")
+    
+    # --- Determine correct port --- #
+    # Prioritize command-line arg if *different* from default.
+    # Otherwise, use the config value (from .env).
+    config_port_str = current_app.config.get('SYSLOG_UDP_PORT')
+    final_port = port # Start with the value from @click.option
+    if final_port == 514 and config_port_str: # If cmd line port is default AND config exists
+        try:
+            final_port = int(config_port_str)
+            current_app.logger.info(f"Using SYSLOG_UDP_PORT from config: {final_port}")
+        except (ValueError, TypeError):
+            current_app.logger.warning(f"Invalid SYSLOG_UDP_PORT ('{config_port_str}') in config, falling back to default/cmd-line: {final_port}")
+    # --- End determine port --- #
+    
+    # Use final_port in logging and binding
+    current_app.logger.info(f"Attempting to start UDP Syslog server on {host}:{final_port}")
     
     # Check if port requires root
-    if port < 1024 and os.geteuid() != 0:
-        current_app.logger.warning(f"Port {port} is privileged. You might need to run this command with sudo.")
+    if final_port < 1024 and os.geteuid() != 0:
+        current_app.logger.warning(f"Port {final_port} is privileged. You might need to run this command with sudo.")
 
     try:
-        # Pass app context or necessary config/db session to Handler if needed
-        # For now, relying on with_appcontext for process_log_batch
-        server = socketserver.UDPServer((host, port), SyslogUDPHandler)
-        current_app.logger.info(f"UDP Syslog server started successfully on {host}:{port}")
+        # Relying on with_appcontext for process_log_batch
+        server = socketserver.UDPServer((host, final_port), SyslogUDPHandler)
+        current_app.logger.info(f"UDP Syslog server started successfully on {host}:{final_port}")
         server.serve_forever()
     except PermissionError:
-        current_app.logger.error(f"Permission denied to bind to port {port}. Try running with sudo or using a port > 1024.")
+        # Use final_port in error message
+        current_app.logger.error(f"Permission denied to bind to port {final_port}. Try running with sudo or using a port > 1024.")
     except OSError as e:
          if "Address already in use" in str(e):
-              current_app.logger.error(f"Port {port} is already in use. Is another service (like rsyslog) listening? ({e})")
+              # Use final_port in error message
+              current_app.logger.error(f"Port {final_port} is already in use. Is another service (like rsyslog) listening? ({e})")
          else:
               current_app.logger.error(f"Failed to start syslog server: {e}")
     except Exception as e:
         current_app.logger.error(f"Syslog server crashed: {e}")
-        # Optional: server.shutdown() if needed, but serve_forever usually handles cleanup
 
 # --- Manual Task Triggers --- 
 

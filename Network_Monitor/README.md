@@ -116,7 +116,7 @@ These instructions guide setting up a local development environment.
         *   Review `DATABASE_URL`. For development with the default SQLite setup, it's best to **leave this line commented out or remove it entirely**. This allows the application to use the default absolute path configured in `backend/config.py`, which points correctly to `backend/data/app.db`.
         *   If you uncomment `DATABASE_URL` for SQLite, ensure you provide the correct **absolute** path (e.g., `DATABASE_URL=sqlite:////full/path/to/Network_Monitor/backend/data/app.db`). Using a relative path like `sqlite:///data/app.db` will likely cause "unable to open database file" errors when running `flask db` commands.
         *   Configure `AI_ENGINE_*` variables if using the AI push feature.
-7.  **Initialize Database (First Time Setup):**
+7.  **Initialize Database & Admin User (First Time Setup):**
     *   Ensure the virtual environment is active (`source backend/venv/bin/activate`).
     *   **Stay in the project root directory (`Network_Monitor`)**.
     *   Set required Flask environment variables:
@@ -141,19 +141,20 @@ These instructions guide setting up a local development environment.
         ```bash
         flask db init
         ```
-    *   **Generate the initial migration script** based on your models (run this after `init` or whenever models change):
+    *   **Generate the initial migration script** based on your models:
         ```bash
-        flask db migrate -m "Initial database schema" 
-        # Use a descriptive message if migrating model changes later
+        flask db migrate -m "Initial database schema"
         ```
-    *   **Apply the migration** to create/update the database tables (run this after `migrate`):
+    *   **Apply the migration** to create/update the database tables:
         ```bash
         flask db upgrade
         ```
     *   **Create your first admin user** (run *after* `flask db upgrade`):
         ```bash
-        flask create-user <username> 
-        # You will be prompted securely for the password
+        # Option 1: Automatic default (admin/admin) - MUST CHANGE PASSWORD LATER
+        flask seed-admin 
+        # Option 2: Manual creation
+        # flask create-user <username> # Prompts for password
         ```
 
 8.  **Run Development Web Server:**
@@ -234,207 +235,80 @@ These instructions guide setting up a local development environment.
 2.  Run: `npm test`
     *   Launches the Jest test runner.
 
-## Deployment (Raspberry Pi 5 Example)
+## Deployment (Ubuntu / Raspberry Pi Example)
 
-These steps provide a general guide for deploying on a Debian-based system like Raspberry Pi OS. Adapt paths and user names as needed. Deploying under a dedicated user (e.g., `netmonitor`) in `/opt/network-monitor` is recommended.
+This section provides guidance for deploying the application on an Ubuntu-based system (like Raspberry Pi OS) using the provided automation scripts.
 
 **Assumptions:**
-*   Target server has necessary base packages (Python 3, pip, venv, git, Node.js, npm, Nginx).
+*   Target server has necessary base packages (Python 3, pip, venv, git, Node.js, npm, Nginx, curl, rsync). PostgreSQL is recommended and packages will be installed, but DB/user creation is manual.
 *   You are logged in with `sudo` privileges.
 *   The server has a static IP or configured DNS.
 
-**1. System Preparation**
-
-*   **Update System & Install Packages:**
+**1. Prepare Code & Scripts:**
+*   Clone the repository to your local machine or directly onto the target server in a temporary location (e.g., your home directory).
     ```bash
-    sudo apt update && sudo apt upgrade -y
-    sudo apt install -y python3 python3-pip python3-venv git nginx curl nodejs npm
+    git clone <repository_url> network-monitor-hub
+    cd network-monitor-hub
     ```
-*   **(Recommended) Create Dedicated User (`netmonitor`):**
+*   Make the scripts executable:
     ```bash
-    sudo adduser netmonitor --disabled-password --gecos ""
-    sudo usermod -aG www-data netmonitor # For Nginx socket access
-    # Optional: Add to sudo if needed for management tasks
-    # sudo usermod -aG sudo netmonitor
-    # Optional: Copy SSH keys if needed for direct login
-    # sudo mkdir -p /home/netmonitor/.ssh
-    # sudo cp ~/.ssh/authorized_keys /home/netmonitor/.ssh/
-    # sudo chown -R netmonitor:netmonitor /home/netmonitor/.ssh
-    ```
-    *(Adjust user/group in subsequent steps and service files if not using `netmonitor`.)*
-
-**2. Deploy Application Code**
-
-*   **Create Directory & Clone:**
-    ```bash
-    sudo mkdir -p /opt/network-monitor
-    sudo chown netmonitor:netmonitor /opt/network-monitor # Assign ownership
-    sudo -u netmonitor git clone <repository_url> /opt/network-monitor
-    cd /opt/network-monitor
+    chmod +x install_network_monitor.sh update_network_monitor.sh
     ```
 
-**3. Backend Setup**
-
-*   **Create Virtual Environment:**
+**2. Run Installation Script:**
+*   Execute the installation script using `sudo`. It will copy the code to `/opt/network-monitor` (by default), set up the environment, build the frontend, and configure systemd/Nginx.
     ```bash
-    sudo -u netmonitor python3 -m venv backend/venv
-    ```
-*   **Activate Virtual Environment:**
-    ```bash
-    source backend/venv/bin/activate
-    ```
-*   **Install Python Dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    pip install gunicorn # Production WSGI server
-    ```
-*   **Configure Environment (`.env` file):**
-    *   `sudo -u netmonitor cp .env.example .env`
-    *   **Edit `.env` as the `netmonitor` user:** `sudo -u netmonitor nano .env`
-        *   Set `FLASK_CONFIG=production`.
-        *   Set a strong `SECRET_KEY`.
-        *   Generate and set a unique `ENCRYPTION_KEY` (see Dev Setup Step 6) - **Backup this key!**
-        *   Set `DATABASE_URL` (Strongly recommend PostgreSQL for production).
-        *   Configure `FRONTEND_ORIGIN` if your frontend is served from a different domain/port than the backend API.
-        *   Configure `AI_ENGINE_*` variables if used.
-        *   Review `SYSLOG_UDP_PORT` (default 514).
-    *   **Set Permissions:** `sudo -u netmonitor chmod 600 .env`
-*   **Apply Database Migrations:**
-    ```bash
-    # Ensure venv active
-    # Set ENV variables for flask command
-    export FLASK_APP=backend.app:create_app
-    export FLASK_CONFIG=production
-    flask db upgrade # Apply migrations
-    unset FLASK_APP FLASK_CONFIG # Unset temporary variables
-    ```
-*   **Create Data Directory (if using SQLite - not recommended for prod):**
-    ```bash
-    # sudo -u netmonitor mkdir -p backend/data
-    ```
-*   **Deactivate venv for now:** `deactivate`
-
-**4. Frontend Build**
-
-*   **Navigate & Install Dependencies:**
-    ```bash
-    cd frontend
-    # Run npm install as the user who owns the directory if possible
-    # If sudo is needed, ensure permissions are fixed later if necessary
-    npm install
-    ```
-*   **Build Static Files:**
-    ```bash
-    npm run build # Output goes to frontend/build/
-    ```
-*   **Return to Project Root:** `cd ..`
-*   **(Optional) Fix Permissions:** If `npm install/build` created files as root, ensure the `netmonitor` user or `www-data` group can access the `frontend/build` directory as needed by Nginx.
-    ```bash
-    # Example: sudo chown -R netmonitor:netmonitor frontend/
+    sudo ./install_network_monitor.sh
     ```
 
-**5. Configure System Services (systemd)**
+**3. Perform Manual Configuration Steps:**
+*   **CRITICAL:** Carefully follow the **MANUAL STEPS REQUIRED** printed at the end of the installation script's output. This includes:
+    *   Setting up the PostgreSQL database and user (if using PostgreSQL).
+    *   Editing `/opt/network-monitor/.env` to set `DATABASE_URL`, `SECRET_KEY`, `ENCRYPTION_KEY`, etc.
+    *   Restarting services (`sudo systemctl restart ...`).
+    *   Editing `/etc/nginx/sites-available/network-monitor` to set the correct `server_name`.
+    *   Setting up HTTPS (Recommended).
+    *   Testing and restarting Nginx (`sudo nginx -t && sudo systemctl restart nginx`).
+    *   Configuring the firewall (`ufw` examples provided).
+    *   Logging in as the default `admin` user and **changing the password immediately** via the Settings page.
+    *   Configuring OpenWRT devices to send logs.
 
-*   **(Important) Disable System Syslog:** If using the app's listener on port 514.
+**4. Verify Installation:**
+*   Check service status:
     ```bash
-    sudo systemctl stop rsyslog && sudo systemctl disable rsyslog
+    sudo systemctl status network-monitor-web.service network-monitor-syslog.service nginx
     ```
-*   **Prepare Service Files:**
-    *   Review `network-monitor-web.service` and `network-monitor-syslog.service`.
-    *   **Verify paths:** `WorkingDirectory`, `ExecStart` (path to `gunicorn`/`flask` in venv).
-    *   **Verify:** `User=netmonitor`, `Group=netmonitor` (or your chosen user/group).
-    *   Ensure the `.sock` path matches the Nginx config.
-    *   Make sure the `Environment` lines correctly point to your `.env` file and set `FLASK_CONFIG=production`.
-*   **Copy, Enable & Start Services:**
+*   Monitor logs:
     ```bash
-    sudo cp network-monitor-web.service /etc/systemd/system/
-    sudo cp network-monitor-syslog.service /etc/systemd/system/
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now network-monitor-web.service # Enable and start
-    sudo systemctl enable --now network-monitor-syslog.service # Enable and start
+    sudo journalctl -f -u network-monitor-web -u network-monitor-syslog
     ```
-*   **Check Status:**
-    ```bash
-    sudo systemctl status network-monitor-web.service network-monitor-syslog.service
-    # View logs: sudo journalctl -u network-monitor-web -f
-    ```
+*   Access the web UI in your browser: `http://<YOUR_SERVER_IP_OR_HOSTNAME>`
 
-**6. Configure Web Server (Nginx)**
+## Updating the Application
 
-*   **Prepare Nginx Configuration (`network-monitor-nginx.conf`):**
-    *   Replace `YOUR_SERVER_IP_OR_HOSTNAME` with your server's actual IP/DNS name.
-    *   Verify `root /opt/network-monitor/frontend/build;` is correct.
-    *   Verify `proxy_pass unix:/tmp/network-monitor.sock;` matches the systemd service.
-    *   **(Recommended)** Add configuration for HTTPS (e.g., using Let's Encrypt).
-*   **Copy & Enable Nginx Site:**
-    ```bash
-    sudo cp network-monitor-nginx.conf /etc/nginx/sites-available/network-monitor
-    sudo ln -s /etc/nginx/sites-available/network-monitor /etc/nginx/sites-enabled/
-    sudo rm -f /etc/nginx/sites-enabled/default # Avoid conflicts
-    ```
-*   **Test and Restart Nginx:**
-    ```bash
-    sudo nginx -t
-    sudo systemctl restart nginx
-    ```
-
-**7. Final Steps & Verification**
-
-*   **Configure Firewall:** Ensure ports (e.g., 80/443 for HTTP/S, 514/UDP for syslog) are open.
-*   **Configure OpenWRT Devices:** Point remote syslog to your server's IP, using the configured UDP port (e.g., 514).
-*   **Access Web UI:** `http(s)://<YOUR_SERVER_IP_OR_HOSTNAME>`.
-*   **Create Admin User (if not done during setup):**
-    *   *Note: If you followed the Development Setup above, you likely created a user already. This is mainly if setting up directly for production.* 
-    ```bash
-    cd /opt/network-monitor
-    source backend/venv/bin/activate
-    export FLASK_APP=backend.app:create_app
-    export FLASK_CONFIG=production # Or development if appropriate
-    # Ensure migrations are applied first: flask db upgrade 
-    flask create-user <username> # Enter the desired username
-    # You will be prompted securely for the password
-    unset FLASK_APP FLASK_CONFIG
-    deactivate
-    ```
-*   **Log In & Test Functionality.**
-*   **Monitor Logs:** `sudo journalctl -u network-monitor-web -f` and `-u network-monitor-syslog -f`.
+1.  **Update Source Code:**
+    *   Navigate to your original project directory (where you have the Git repository).
+        ```bash
+        cd ~/network-monitor-hub # Or your source location
+        ```
+    *   Pull the latest changes:
+        ```bash
+        git pull origin main # Or your branch
+        ```
+2.  **(Optional) Backup:** Backup `/opt/network-monitor/.env` and your database.
+3.  **Run Update Script:**
+    *   Execute the update script using `sudo` from your updated source directory.
+        ```bash
+        sudo ./update_network_monitor.sh
+        ```
+    *   This script stops services, syncs files using `rsync`, updates dependencies, runs migrations, rebuilds the frontend, resets ownership, and restarts services.
+4.  **Verify Update:** Check service status and functionality.
 
 ## Configuration Details
 
 *   **Backend:** Configured via `backend/config.py` and environment variables loaded from `.env` (see `.env.example`).
 *   **Frontend:** API endpoint configured in `frontend/src/services/api.js`.
 *   **Deployment:** Nginx acts as reverse proxy; Gunicorn runs the Flask app; systemd manages services.
-
-## Updating the Application
-
-1.  Navigate to `/opt/network-monitor`.
-2.  Stop services: `sudo systemctl stop network-monitor-web network-monitor-syslog`.
-3.  Pull latest code: `sudo -u netmonitor git pull origin main` (or your branch).
-4.  Update backend dependencies & DB:
-    ```bash
-    source backend/venv/bin/activate
-    pip install -r requirements.txt
-    export FLASK_APP=backend.app:create_app
-    export FLASK_CONFIG=production
-    flask db upgrade # Apply new migrations
-    unset FLASK_APP FLASK_CONFIG
-    deactivate
-    ```
-5.  Rebuild frontend (if changed):
-    ```bash
-    cd frontend
-    # sudo -u netmonitor npm install # If package.json changed
-    # sudo -u netmonitor npm run build
-    cd ..
-    # Fix permissions if needed
-    ```
-6.  Copy updated service/Nginx files if they changed.
-7.  Reload & Restart:
-    ```bash
-    sudo systemctl daemon-reload # If service files changed
-    # sudo nginx -t && sudo systemctl restart nginx # If nginx config changed
-    sudo systemctl start network-monitor-web network-monitor-syslog
-    ```
 
 ## Future Enhancements
 

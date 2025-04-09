@@ -3,16 +3,15 @@ Description=Network Monitor Web Backend Service (Gunicorn)
 After=network.target
 
 [Service]
-User=pi # Or the user you are running the app as
-Group=www-data # Or the group for web access
-WorkingDirectory=/opt/openwrt-loghub # Adjust path as needed
-Environment="PATH=/opt/openwrt-loghub/venv/bin"
-Environment="FLASK_APP=wsgi.py"
+User=netmonitor # Corrected
+Group=netmonitor # Corrected
+WorkingDirectory=/opt/network-monitor # Corrected
+Environment="PATH=/opt/network-monitor/backend/venv/bin" # Corrected
+Environment="FLASK_APP=wsgi.py" # Keep wsgi for gunicorn
 Environment="FLASK_CONFIG=production"
-# Ensure your .env file is in the WorkingDirectory or specify path:
-# Environment="DOTENV_PATH=/opt/openwrt-loghub/.env"
+EnvironmentFile=/opt/network-monitor/.env # Explicitly load .env
 
-ExecStart=/opt/openwrt-loghub/venv/bin/gunicorn \
+ExecStart=/opt/network-monitor/backend/venv/bin/gunicorn \
     --workers 3 \
     --bind unix:/tmp/network-monitor.sock \
     # -m 0660 # Leave commented out as default permissions work reliably

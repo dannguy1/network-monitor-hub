@@ -218,12 +218,10 @@ echo_warning "   - Test and restart Nginx: 'sudo nginx -t && sudo systemctl rest
 echo_warning "4. **Configure Firewall:**"
 echo_warning "   - Ensure ports are open (e.g., 80/HTTP, 443/HTTPS, 5432/PostgreSQL if needed remotely, and the Syslog UDP port)."
 echo_warning "   - Example using ufw: 'sudo ufw allow 80/tcp', 'sudo ufw allow 443/tcp', 'sudo ufw allow 514/udp' (Adjust syslog port)"
-echo_warning "5. **Create Admin User:**"
-echo_info "   Attempting to create default admin user ('admin'/'admin')..."
-# Run seed-admin command automatically
-sudo -u $APP_USER bash -c "export FLASK_APP=backend.app:create_app; export FLASK_CONFIG=production; cd $APP_DIR && backend/venv/bin/flask seed-admin"
-echo_warning "   (You can manually create other users using 'flask create-user <username>')"
-
+echo_warning "5. **Review Admin User:**"
+echo_info    "   - The default admin user ('admin'/'admin') was created automatically."
+echo_warning "   - **IMPORTANT:** Log in as 'admin' and change the password immediately using the Settings page."
+echo_warning "   - You can manually create other users using 'flask create-user <username>'."
 echo_warning "6. **Configure OpenWRT Devices:**"
 echo_warning "   - Point remote syslog to this server's IP on the configured UDP port."
 echo_info "Access the web UI at: http://<YOUR_SERVER_IP_OR_HOSTNAME>"
