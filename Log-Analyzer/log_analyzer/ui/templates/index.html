@@ -57,7 +57,81 @@
         <h2>Configuration (/config)</h2>
         <pre id="config-view">Loading...</pre>
 
+        <h2>Processing Statistics (/metrics)</h2>
+        <div id="metrics-view">
+            <pre>Loading...</pre>
+        </div>
+
         <script>
+            // --- Helper Function to Parse Prometheus Text --- //
+            function parsePrometheusText(text) {
+                const lines = text.split('\n');
+                const metrics = {};
+                const metricRegex = /^(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*){?(?<labels>[^}]*)}?\s+(?<value>[+-]?(?:[0-9]*[.])?[0-9]+(?:[eE][+-]?[0-9]+)?|NaN|\+Inf|-Inf)\s*(?<timestamp>\d+)?$/;
+
+                // Look for specific metrics we want to display
+                const targetMetrics = [
+                    'loganalyzer_logs_received_total',
+                    'loganalyzer_logs_parsed_total',
+                    'loganalyzer_logs_failed_total',
+                    'loganalyzer_parsed_log_queue_size',
+                    'loganalyzer_analysis_result_queue_size'
+                ];
+
+                let totals = {
+                    received: 0,
+                    parsed: 0,
+                    failed_no_match: 0,
+                    failed_decode: 0,
+                    failed_json_decode: 0,
+                    failed_invalid_json: 0,
+                    failed_other: 0
+                };
+                let queues = {
+                    parsed_queue: 'N/A',
+                    analysis_queue: 'N/A'
+                }
+
+                for (const line of lines) {
+                    if (line.startsWith('#') || line.trim() === '') {
+                        continue;
+                    }
+                    const match = line.match(metricRegex);
+                    if (match && match.groups) {
+                        const { name, labels, value } = match.groups;
+                        const numericValue = parseFloat(value);
+
+                        if (targetMetrics.includes(name)) {
+                            // Simple aggregation for totals (summing across all labels)
+                            if (name === 'loganalyzer_logs_received_total') {
+                                totals.received += numericValue;
+                            } else if (name === 'loganalyzer_logs_parsed_total') {
+                                totals.parsed += numericValue;
+                            } else if (name === 'loganalyzer_logs_failed_total') {
+                                // Check labels for specific failure reasons
+                                if (labels && labels.includes('reason="no_match"')) {
+                                    totals.failed_no_match += numericValue;
+                                } else if (labels && labels.includes('reason="decode_error"')) {
+                                    totals.failed_decode += numericValue;
+                                } else if (labels && labels.includes('reason="json_decode_error"')) {
+                                    totals.failed_json_decode += numericValue;
+                                } else if (labels && labels.includes('reason="invalid_json_structure"')) {
+                                    totals.failed_invalid_json += numericValue;
+                                } else {
+                                    totals.failed_other += numericValue; // Catch other/unlabeled failures
+                                }
+                            } else if (name === 'loganalyzer_parsed_log_queue_size') {
+                                queues.parsed_queue = numericValue;
+                            } else if (name === 'loganalyzer_analysis_result_queue_size') {
+                                queues.analysis_queue = numericValue;
+                            }
+                        }
+                    }
+                }
+                return { totals, queues };
+            }
+            // ----------------------------------------------- //
+
             // Fetch API status
             fetch('/api/status')
                 .then(response => response.json())
@@ -84,6 +158,35 @@
                 .catch(error => {
                     document.getElementById('config-view').textContent = 'Error loading configuration: ' + error;
                 });
+
+            // --- Fetch and Display Metrics --- //
+            fetch('/metrics')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    const parsedData = parsePrometheusText(data);
+                    let displayText = "<dl>";
+                    displayText += `<dt>Total Received:</dt><dd>${parsedData.totals.received}</dd>`;
+                    displayText += `<dt>Total Parsed (as JSON):</dt><dd>${parsedData.totals.parsed}</dd>`;
+                    displayText += `<dt>Failed (No Match):</dt><dd>${parsedData.totals.failed_no_match}</dd>`;
+                    displayText += `<dt>Failed (JSON Decode):</dt><dd>${parsedData.totals.failed_json_decode}</dd>`;
+                    displayText += `<dt>Failed (Invalid JSON):</dt><dd>${parsedData.totals.failed_invalid_json}</dd>`;
+                    displayText += `<dt>Failed (UTF-8 Decode):</dt><dd>${parsedData.totals.failed_decode}</dd>`;
+                    displayText += `<dt>Failed (Other):</dt><dd>${parsedData.totals.failed_other}</dd>`;
+                    displayText += `<dt>Parsed Queue Size:</dt><dd>${parsedData.queues.parsed_queue}</dd>`;
+                    displayText += `<dt>Analysis Queue Size:</dt><dd>${parsedData.queues.analysis_queue}</dd>`;
+                    displayText += "</dl>";
+                    document.getElementById('metrics-view').innerHTML = displayText;
+                })
+                .catch(error => {
+                    console.error("Error fetching metrics:", error);
+                    document.getElementById('metrics-view').innerHTML = '<pre>Error loading metrics: ' + error + '</pre>';
+                });
+            // ----------------------------------- //
         </script>
     </div> <!-- Close container -->
 </body>
