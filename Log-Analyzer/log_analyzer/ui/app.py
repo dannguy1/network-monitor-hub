@@ -2,6 +2,7 @@ import logging
 from flask import Flask, render_template, request, jsonify, Response, flash, redirect, url_for
 import threading
 import queue
+import re # Import re for validation
 from typing import Dict, Any, Optional
 from ruamel.yaml import YAML # Use ruamel.yaml for safer writing
 import os
@@ -10,6 +11,7 @@ import os
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 # --- Add Flask-WTF imports ---
+from flask_wtf.csrf import CSRFProtect # Import CSRFProtect
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
@@ -19,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 # --- Authentication Setup --- #
 login_manager = LoginManager()
+csrf = CSRFProtect() # Initialize CSRFProtect
 
 # --- Add LoginForm Definition ---
 class LoginForm(FlaskForm):
@@ -57,7 +60,6 @@ def create_app(initial_config: Dict[str, Any],
                config_path: str,
                parsed_q: Optional[queue.Queue] = None,
                analysis_q: Optional[queue.Queue] = None,
-               parser_ref: Optional[Any] = None, # Type depends on LogParser class
                analyzer_ref: Optional[Any] = None, # Type depends on AnalyzerManager class
                publisher_ref: Optional[Any] = None, # Type depends on CommandPublisher class
                mqtt_ref: Optional[Any] = None # Type depends on MQTTClient class
@@ -69,7 +71,6 @@ def create_app(initial_config: Dict[str, Any],
         config_path: The path to the config file (for saving).
         parsed_q: Reference to the parsed log queue.
         analysis_q: Reference to the analysis result queue.
-        parser_ref: Reference to the LogParser instance.
         analyzer_ref: Reference to the AnalyzerManager instance.
         publisher_ref: Reference to the CommandPublisher instance.
         mqtt_ref: Reference to the MQTTClient (ingestion) instance.
@@ -80,7 +81,6 @@ def create_app(initial_config: Dict[str, Any],
         'config_path': config_path,
         'parsed_queue': parsed_q,
         'analysis_result_queue': analysis_q,
-        'log_parser': parser_ref,
         'analyzer_manager': analyzer_ref,
         'command_publisher': publisher_ref,
         'mqtt_client': mqtt_ref
@@ -118,6 +118,10 @@ def create_app(initial_config: Dict[str, Any],
     login_manager.login_message = u"Please log in to access this page."
     login_manager.login_message_category = "info"
     # -------------------------------
+
+    # --- Initialize CSRF Protection --- #
+    csrf.init_app(app)
+    # --------------------------------
 
     yaml = YAML()
     yaml.preserve_quotes = True
@@ -188,26 +192,110 @@ def create_app(initial_config: Dict[str, Any],
                     current_data = yaml.load(f)
 
                 # --- Update specific sections based on form data ---
-                # Example: Update MQTT host/port
+                mq_config = current_data.setdefault('message_queue', {})
+
+                # Update MQTT host/port
                 if 'mqtt_host' in request.form:
-                    current_data['message_queue']['host'] = request.form['mqtt_host']
+                    mq_config['host'] = request.form['mqtt_host']
                 if 'mqtt_port' in request.form:
                     try:
-                        current_data['message_queue']['port'] = int(request.form['mqtt_port'])
+                        mq_config['port'] = int(request.form['mqtt_port'])
                     except (ValueError, TypeError):
                         flash('Invalid MQTT Port number', 'danger')
-                        # Return to form with current data
                         return render_template('edit_config.html', config=current_data)
 
-                # Example: Update enabled AI modules (checkboxes)
+                # Update MQTT Auth
+                if 'mqtt_username' in request.form:
+                    mq_config['username'] = request.form['mqtt_username']
+                # Only update password if a new one is provided
+                if 'mqtt_password' in request.form and request.form['mqtt_password']:
+                    mq_config['password'] = request.form['mqtt_password'] # Store plain text - user must secure config file!
+                    # Consider hashing or using a secrets management system in a real application.
+                    flash('MQTT password updated. Ensure config file permissions are secure.', 'warning')
+
+                # Update MQTT TLS settings
+                mq_config['use_tls'] = 'mqtt_use_tls' in request.form
+                if 'mqtt_ca_certs' in request.form:
+                    mq_config['ca_certs'] = request.form['mqtt_ca_certs']
+                if 'mqtt_certfile' in request.form:
+                    mq_config['certfile'] = request.form['mqtt_certfile']
+                if 'mqtt_keyfile' in request.form:
+                    mq_config['keyfile'] = request.form['mqtt_keyfile']
+
+                # Update enabled AI modules (checkboxes)
+                ai_config = current_data.setdefault('ai_modules', {})
                 if 'ai_modules_enabled[]' in request.form:
                      # Get list of checked modules from form
                      enabled_modules = request.form.getlist('ai_modules_enabled[]')
-                     current_data['ai_modules']['enabled'] = enabled_modules
+                     ai_config['enabled'] = enabled_modules
                 else: # Handle case where all are unchecked
-                     current_data['ai_modules']['enabled'] = []
+                     ai_config['enabled'] = []
 
-                # TODO: Add more fields as needed (Parsing rules, Command Output, etc.)
+                # --- Update Parsing Rules --- #
+                parsing_config = current_data.setdefault('parsing', {})
+                new_rules = []
+                rule_index = 0
+                has_invalid_regex = False # Flag for validation
+
+                while f'rule_index_{rule_index}' in request.form:
+                    index_str = str(rule_index)
+                    # Check if delete checkbox is checked for this rule
+                    if f'rule_delete_{index_str}' not in request.form:
+                        # Not deleted, update it
+                        name = request.form.get(f'rule_name_{index_str}', '').strip()
+                        pattern = request.form.get(f'rule_pattern_{index_str}', '').strip()
+                        if name and pattern:
+                            # --- Validate Regex --- #
+                            try:
+                                re.compile(pattern)
+                                new_rules.append({'name': name, 'pattern': pattern})
+                            except re.error as e:
+                                has_invalid_regex = True
+                                flash(f'Rule \'{name}\' has an invalid regex pattern: {e}. Not saved.', 'danger')
+                            # ---------------------- #
+                        else:
+                            # Don't flash warning if just empty, just don't save
+                            pass
+                    # If deleted, simply don't add it to new_rules
+                    rule_index += 1
+
+                # Check for a new rule addition
+                new_name = request.form.get('new_rule_name', '').strip()
+                new_pattern = request.form.get('new_rule_pattern', '').strip()
+                if new_name and new_pattern:
+                    # Basic check for duplicate name (can be improved)
+                    if any(rule['name'] == new_name for rule in new_rules):
+                        flash(f'New rule name "{new_name}" already exists. Not added.', 'warning')
+                    else:
+                        # --- Validate Regex --- #
+                        try:
+                            re.compile(new_pattern)
+                            new_rules.append({'name': new_name, 'pattern': new_pattern})
+                            flash(f'New rule "{new_name}" added.', 'info')
+                        except re.error as e:
+                            has_invalid_regex = True
+                            flash(f'New rule \'{new_name}\' has an invalid regex pattern: {e}. Not added.', 'danger')
+                        # ---------------------- #
+                elif new_name or new_pattern:
+                    # Only warn if one field is filled but not the other
+                    flash('New rule was not added because both name and pattern are required.', 'warning')
+
+                # --- Prevent saving if any regex was invalid --- #
+                if has_invalid_regex:
+                    flash('Errors found in regex patterns. Configuration not saved.', 'danger')
+                    # Re-render the form with the submitted (potentially bad) data for correction
+                    # This is tricky because we need to reconstruct the `config` object partly
+                    # For simplicity now, we reload from file and show errors
+                    with open(config_path, 'r') as f:
+                        config_data = yaml.load(f)
+                    # Pass original rules to template for display
+                    return render_template('edit_config.html', config=config_data)
+                # -------------------------------------------- #
+
+                parsing_config['rules'] = new_rules
+                # ----------------------------
+
+                # TODO: Add more fields as needed (Command Output, etc.)
 
                 # Write back using ruamel.yaml
                 with open(config_path, 'w') as f:
@@ -257,7 +345,7 @@ def create_app(initial_config: Dict[str, Any],
     logger.info("Flask app created.")
     return app
 
-def run_web_server(config: Dict[str, Any], config_path: str, parsed_q, analysis_q, parser_ref, analyzer_ref, publisher_ref, mqtt_ref):
+def run_web_server(config: Dict[str, Any], config_path: str, parsed_q, analysis_q, analyzer_ref, publisher_ref, mqtt_ref):
     """Runs the Flask web server in a separate thread."""
     ui_config = config.get('web_ui', {})
     host = ui_config.get('host', '127.0.0.1')
@@ -270,7 +358,7 @@ def run_web_server(config: Dict[str, Any], config_path: str, parsed_q, analysis_
 
     app = create_app(
         config, config_path, parsed_q, analysis_q,
-        parser_ref, analyzer_ref, publisher_ref, mqtt_ref
+        analyzer_ref, publisher_ref, mqtt_ref
     )
 
     try:
