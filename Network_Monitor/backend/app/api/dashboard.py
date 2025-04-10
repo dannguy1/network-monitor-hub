@@ -123,8 +123,11 @@ def get_summary():
 def trigger_ai_push():
     """API endpoint to manually trigger the AI log push."""
     current_app.logger.info(f"Manual AI log push triggered via API by user {current_user.username}")
+    # --- Add Debug --- #
     ai_enabled = current_app.config.get('AI_ENGINE_ENABLED', False)
     ai_method = current_app.config.get('AI_ENGINE_PUSH_METHOD', 'http')
+    current_app.logger.debug(f"Trigger AI Push Check: AI_ENGINE_ENABLED={ai_enabled} (Type: {type(ai_enabled)}), AI_ENGINE_PUSH_METHOD='{ai_method}' (Type: {type(ai_method)})")
+    # --- End Debug --- #
 
     if not ai_enabled or ai_method != 'mqtt':
         msg = "AI Pusher is disabled or not configured for MQTT."
