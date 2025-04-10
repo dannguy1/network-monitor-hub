@@ -96,6 +96,9 @@ fi
 # --- 6. Restart Services ---
 echo_info "Restarting services..."
 sudo systemctl start network-monitor-web.service network-monitor-syslog.service
+sleep 2 # Add a small delay to allow services to start before reload
+echo_info "Attempting to reload web service for code changes..."
+sudo systemctl reload network-monitor-web.service || echo_warning "Reload command failed or not supported, restart should suffice."
 
 echo_info "-----------------------------------------------------------------------"
 echo_info "Network Monitor Hub Update Script Completed!"
