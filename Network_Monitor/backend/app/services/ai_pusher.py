@@ -127,7 +127,7 @@ def push_logs_to_ai(max_batch_size=DEFAULT_BATCH_SIZE):
             # Fetch logs needing push
             logs_to_push = LogEntry.query \
                 .filter_by(pushed_to_ai=False) \
-                .options(db.joinedload(LogEntry.device)) # Eager load device info
+                .options(db.joinedload(LogEntry.device)) \
                 .order_by(LogEntry.timestamp) \
                 .limit(max_batch_size) \
                 .all()
