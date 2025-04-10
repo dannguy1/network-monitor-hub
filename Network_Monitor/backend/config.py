@@ -24,7 +24,18 @@ class Config:
     # AI Engine Configuration (Placeholders - Set in .env)
     AI_ENGINE_ENDPOINT = os.environ.get('AI_ENGINE_ENDPOINT')
     AI_ENGINE_API_KEY = os.environ.get('AI_ENGINE_API_KEY')
-    AI_PUSH_INTERVAL_MINUTES = int(os.environ.get('AI_PUSH_INTERVAL_MINUTES', '10')) # Default 10 mins
+    AI_PUSH_INTERVAL_MINUTES = int(os.environ.get('AI_PUSH_INTERVAL_MINUTES', '15')) # Default 15 mins
+
+    # --- AI Pusher Method & MQTT Config (Additions) --- #
+    AI_ENGINE_ENABLED = os.environ.get('AI_ENGINE_ENABLED', 'false').lower() == 'true'
+    AI_ENGINE_PUSH_METHOD = os.environ.get('AI_ENGINE_PUSH_METHOD', 'http') # http, mqtt
+    AI_ENGINE_MQTT_HOST = os.environ.get('AI_ENGINE_MQTT_HOST', 'localhost')
+    AI_ENGINE_MQTT_PORT = int(os.environ.get('AI_ENGINE_MQTT_PORT', '1883'))
+    AI_ENGINE_MQTT_TOPIC_PREFIX = os.environ.get('AI_ENGINE_MQTT_TOPIC_PREFIX', 'network_monitor/logs')
+    AI_ENGINE_MQTT_USERNAME = os.environ.get('AI_ENGINE_MQTT_USERNAME')
+    AI_ENGINE_MQTT_PASSWORD = os.environ.get('AI_ENGINE_MQTT_PASSWORD')
+    AI_ENGINE_MQTT_TLS_ENABLED = os.environ.get('AI_ENGINE_MQTT_TLS_ENABLED', 'false').lower() == 'true'
+    AI_ENGINE_MQTT_TLS_CA_CERTS = os.environ.get('AI_ENGINE_MQTT_TLS_CA_CERTS')
 
     # Syslog Server (Built-in) Configuration
     SYSLOG_UDP_PORT = os.environ.get('SYSLOG_UDP_PORT')
