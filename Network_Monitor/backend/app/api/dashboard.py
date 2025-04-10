@@ -2,10 +2,12 @@ from flask import Blueprint, jsonify, current_app
 from flask_login import login_required
 from datetime import datetime, timedelta
 import socket
+import traceback # Import traceback for error logging
 
 # Corrected imports:
 from .. import db, scheduler        # Import scheduler instance
-from ..models import Device, LogEntry # Models are defined in app/models/ (one level up, then down)
+from ..models import Device, LogEntry, Credential # Models are defined in app/models/ (one level up, then down)
+from ...services import ai_pusher # Import ai_pusher
 
 # Create Blueprint
 bp = Blueprint('dashboard', __name__)
@@ -114,3 +116,29 @@ def get_summary():
     except Exception as e:
         current_app.logger.error(f"Error generating dashboard summary: {e}", exc_info=True)
         return jsonify({"error": "Failed to generate dashboard summary"}), 500 
+
+# --- New Endpoint --- #
+@bp.route('/trigger-ai-push', methods=['POST']) # Use POST for actions
+@login_required
+def trigger_ai_push():
+    """API endpoint to manually trigger the AI log push."""
+    current_app.logger.info(f"Manual AI log push triggered via API by user {current_user.username}")
+    ai_enabled = current_app.config.get('AI_ENGINE_ENABLED', False)
+    ai_method = current_app.config.get('AI_ENGINE_PUSH_METHOD', 'http')
+
+    if not ai_enabled or ai_method != 'mqtt':
+        msg = "AI Pusher is disabled or not configured for MQTT."
+        current_app.logger.warning(msg)
+        return jsonify({"success": False, "message": msg}), 400
+
+    try:
+        # Call the existing pusher function
+        processed, failed = ai_pusher.push_logs_to_ai()
+        msg = f"AI Push triggered. Attempted: {processed}, Failed: {failed}"
+        current_app.logger.info(msg)
+        return jsonify({"success": True, "message": msg, "processed": processed, "failed": failed})
+
+    except Exception as e:
+        current_app.logger.error(f"Error during API triggered AI push: {e}", exc_info=True)
+        # traceback.print_exc() # Optional: print traceback to console if logger isn't enough
+        return jsonify({"success": False, "message": f"Error triggering push: {e}"}), 500 
