@@ -111,6 +111,10 @@ def create_app(config_name=None):
     # Schedule tasks if needed (make sure this runs only once)
     if not app.config.get('TESTING'): # Don't run scheduler in tests easily
         # Check if AI Pusher is enabled
+        # --- Add Debug Print --- #
+        ai_enabled_raw = app.config.get('AI_ENGINE_ENABLED')
+        print(f"DEBUG: Raw value of AI_ENGINE_ENABLED from app.config: {ai_enabled_raw} (Type: {type(ai_enabled_raw)})")
+        # --- End Debug Print --- #
         ai_enabled = app.config.get('AI_ENGINE_ENABLED', False)
 
         if ai_enabled:
