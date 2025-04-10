@@ -199,7 +199,9 @@ function LogList() {
         try {
             const response = await api.post('/dashboard/trigger-ai-push'); // Use correct endpoint
             if (response.data.success) {
-                toast.success(response.data.message || 'AI Push triggered successfully!');
+                const { processed, failed } = response.data;
+                const successMsg = `AI Push triggered. Attempted: ${processed !== undefined ? processed : 'N/A'}, Failed: ${failed !== undefined ? failed : 'N/A'}`;
+                toast.success(successMsg);
             } else {
                 toast.error(response.data.message || 'Failed to trigger AI Push.');
             }
