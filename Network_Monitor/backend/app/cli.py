@@ -283,6 +283,7 @@ def set_password_command(username, password):
         click.echo(f'Error updating password for user "{username}": {e}', err=True)
 
 @click.command('send-test-mqtt')
+@with_appcontext
 def send_test_mqtt():
     """Sends a single predefined test message via MQTT to Log-Analyzer."""
     click.echo("Attempting to send test MQTT message...")
