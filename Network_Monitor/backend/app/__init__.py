@@ -110,20 +110,22 @@ def create_app(config_name=None):
 
     # Schedule tasks if needed (make sure this runs only once)
     if not app.config.get('TESTING'): # Don't run scheduler in tests easily
-        # Check if AI endpoint is configured before scheduling
-        ai_endpoint = app.config.get('AI_ENGINE_ENDPOINT')
-        if ai_endpoint:
-            # Check if the job is already scheduled to avoid duplicates on reload
+        # Check if AI Pusher is enabled
+        ai_enabled = app.config.get('AI_ENGINE_ENABLED', False)
+
+        if ai_enabled:
+            # AI Pusher is enabled (assumes MQTT method based on current ai_pusher.py)
             if not scheduler.get_job('push_ai_logs'):
-                from .services.ai_pusher import push_logs_to_ai
-                push_interval = app.config.get('AI_PUSH_INTERVAL_MINUTES', 10)
+                from .services.ai_pusher import push_logs_to_ai # This function handles MQTT push
+                push_interval = app.config.get('AI_PUSH_INTERVAL_MINUTES', 15)
                 scheduler.add_job(id='push_ai_logs', func=push_logs_to_ai,
                                 trigger='interval', minutes=push_interval)
-                print(f"AI Pusher Enabled: Scheduled AI log push to {ai_endpoint} every {push_interval} minutes.")
+                mqtt_host = app.config.get('AI_ENGINE_MQTT_HOST', '?') # Get host for logging
+                print(f"AI Pusher Enabled: Scheduled log push via MQTT to {mqtt_host} every {push_interval} minutes.")
             else:
                 print("AI Pusher: Job 'push_ai_logs' already scheduled.")
         else:
-             print("AI Pusher Disabled: AI_ENGINE_ENDPOINT not configured in environment/config.")
+             print("AI Pusher Disabled (AI_ENGINE_ENABLED is False).")
 
     print(f"App created with config: {config_name}")
     return app 
