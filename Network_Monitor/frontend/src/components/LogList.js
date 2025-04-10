@@ -3,6 +3,7 @@ import api from '../services/api';
 // Import necessary React-Bootstrap components
 import { Table, Spinner, Alert, Pagination, Card, Form, Row, Col, Button, Badge, Modal, Toast, ToastContainer } from 'react-bootstrap';
 import { ArrowClockwise, Trash } from 'react-bootstrap-icons'; // Import refresh and trash icons
+import { toast } from 'react-toastify'; // Import toast
 
 // Define common log levels for filtering
 const LOG_LEVELS = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY'];
@@ -31,6 +32,7 @@ function LogList() {
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [toastVariant, setToastVariant] = useState('success');
+    const [isPushing, setIsPushing] = useState(false); // State for button loading
 
     const fetchLogsAndDevices = useCallback(() => {
         setLoading(true);
@@ -191,6 +193,26 @@ function LogList() {
         }
     }
 
+    // --- New Function to Handle AI Push --- //
+    const handleTriggerAIPush = async () => {
+        setIsPushing(true); // Set loading state for the button
+        try {
+            const response = await api.post('/dashboard/trigger-ai-push'); // Use correct endpoint
+            if (response.data.success) {
+                toast.success(response.data.message || 'AI Push triggered successfully!');
+            } else {
+                toast.error(response.data.message || 'Failed to trigger AI Push.');
+            }
+        } catch (error) {
+            console.error("Error triggering AI Push:", error);
+            const errorMsg = error.response?.data?.message || 'An error occurred while triggering the push.';
+            toast.error(errorMsg);
+        } finally {
+            setIsPushing(false); // Reset loading state
+        }
+    };
+    // ---------------------------------------
+
     return (
         <>
          <Card>
@@ -275,6 +297,14 @@ function LogList() {
                          <Col md={3} className="d-flex justify-content-end">
                              <Button variant="primary" onClick={handleApplyFilters} className="me-2">Apply Filters</Button>
                              <Button variant="secondary" onClick={handleClearFilters}>Clear</Button>
+                             <Button
+                                variant="info"
+                                onClick={handleTriggerAIPush}
+                                className="ms-2"
+                                disabled={isPushing || loading}
+                             >
+                                {isPushing ? <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> Pushing...</> : 'Push Logs to AI'}
+                             </Button>
                          </Col>
                      </Row>
                  </Form>
