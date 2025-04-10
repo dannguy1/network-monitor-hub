@@ -3,10 +3,19 @@ from flask.cli import with_appcontext
 import socketserver
 import time
 import os
+import sys
 
 # Import services and models needed for commands
 from .services import syslog_processor, ai_pusher
 from . import db # If direct db access needed
+
+# Ensure backend is in path for sibling imports if running directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from .models import User, Device
+import paho.mqtt.client as paho_mqtt # Import for test command
+import ssl # Import for test command
+import json # Import for test command
 
 # --- Syslog Listener Command --- 
 
@@ -75,11 +84,32 @@ def run_syslog_command(host, port):
 @click.command('trigger-ai-push')
 @with_appcontext
 def trigger_ai_push_command():
-    """Manually triggers the AI log push process."""
-    from flask import current_app
-    current_app.logger.info("Manually triggering AI log push...")
-    processed, failed = ai_pusher.push_logs_to_ai()
-    current_app.logger.info(f"Manual AI log push complete. Processed: {processed}, Failed: {failed}")
+    """Manually triggers the AI log push process (MQTT or HTTP based on config)."""
+    # Check config to decide which push function to call
+    ai_enabled = current_app.config.get('AI_ENGINE_ENABLED', False)
+    ai_method = current_app.config.get('AI_ENGINE_PUSH_METHOD', 'http')
+
+    if not ai_enabled:
+        click.echo("AI Pusher is disabled (AI_ENGINE_ENABLED=False). Cannot trigger push.")
+        return
+
+    click.echo(f"Triggering AI log push (Method: {ai_method})...")
+    try:
+        if ai_method == 'mqtt':
+            # We call the function directly, it should handle connection/logic
+            processed, failed = ai_pusher.push_logs_to_ai()
+            click.echo(f"MQTT Push function finished. Attempted: {processed}, Failed Publish: {failed}")
+        elif ai_method == 'http':
+             # Placeholder for potential future HTTP push function re-implementation
+             # processed, failed = ai_pusher.push_logs_to_ai_http() 
+             click.echo(f"HTTP Push function (currently placeholder) would run here.")
+        else:
+             click.echo(f"Unsupported AI push method configured: {ai_method}")
+
+    except Exception as e:
+        click.echo(f"Error during manual AI push trigger: {e}")
+        import traceback
+        traceback.print_exc()
 
 # --- Process Log File Command --- 
 
@@ -252,6 +282,69 @@ def set_password_command(username, password):
         db.session.rollback()
         click.echo(f'Error updating password for user "{username}": {e}', err=True)
 
+@click.command('send-test-mqtt')
+def send_test_mqtt():
+    """Sends a single predefined test message via MQTT to Log-Analyzer."""
+    click.echo("Attempting to send test MQTT message...")
+
+    # Check if MQTT push is configured and enabled
+    if not current_app.config.get('AI_ENGINE_ENABLED') or current_app.config.get('AI_ENGINE_PUSH_METHOD') != 'mqtt':
+        click.echo(click.style("Error: AI Pusher is not enabled or not configured for MQTT in .env", fg='red'))
+        return
+
+    host = current_app.config.get('AI_ENGINE_MQTT_HOST')
+    port = current_app.config.get('AI_ENGINE_MQTT_PORT')
+    topic_prefix = current_app.config.get('AI_ENGINE_MQTT_TOPIC_PREFIX')
+    username = current_app.config.get('AI_ENGINE_MQTT_USERNAME')
+    password = current_app.config.get('AI_ENGINE_MQTT_PASSWORD')
+    use_tls = current_app.config.get('AI_ENGINE_MQTT_TLS_ENABLED')
+    ca_certs = current_app.config.get('AI_ENGINE_MQTT_TLS_CA_CERTS')
+    qos = 1 # Use standard QoS for testing
+
+    if not host or not port or not topic_prefix:
+        click.echo(click.style("Error: Missing MQTT configuration (HOST, PORT, TOPIC_PREFIX) in .env", fg='red'))
+        return
+
+    client_id = f"network-monitor-test-sender-{os.getpid()}"
+    test_topic = f"{topic_prefix}/test_command"
+    test_payload = json.dumps({"test_message": "Hello from Network-Monitor test command!", "timestamp": time.time()})
+
+    click.echo(f"Connecting to {host}:{port}...")
+    mqttc = None
+    try:
+        mqttc = paho_mqtt.Client(client_id=client_id)
+        if username:
+            mqttc.username_pw_set(username, password)
+        if use_tls:
+            click.echo("Configuring TLS...")
+            mqttc.tls_set(ca_certs=ca_certs, cert_reqs=ssl.CERT_REQUIRED if ca_certs else ssl.CERT_NONE,
+                          tls_version=ssl.PROTOCOL_TLSv1_2)
+        
+        # Synchronous connect for CLI command
+        mqttc.connect(host, port, 60)
+        mqttc.loop_start() # Start loop for callbacks, though not strictly needed for single publish
+        time.sleep(1) # Give a moment to establish connection
+
+        click.echo(f"Publishing to topic '{test_topic}'")
+        click.echo(f"Payload: {test_payload}")
+        msg_info = mqttc.publish(test_topic, payload=test_payload.encode('utf-8'), qos=qos)
+        msg_info.wait_for_publish(timeout=5)
+
+        if msg_info.is_published():
+            click.echo(click.style("Test message published successfully!", fg='green'))
+        else:
+            click.echo(click.style(f"Test message failed to publish (rc={msg_info.rc}). Check broker and Log-Analyzer.", fg='red'))
+
+    except Exception as e:
+        click.echo(click.style(f"Error during MQTT test send: {e}", fg='red'))
+        import traceback
+        traceback.print_exc()
+    finally:
+        if mqttc:
+            click.echo("Disconnecting MQTT client...")
+            mqttc.loop_stop()
+            mqttc.disconnect()
+
 def register(app):
     """Register CLI commands with the Flask app."""
     app.cli.add_command(run_syslog_command)
@@ -260,4 +353,5 @@ def register(app):
     app.cli.add_command(create_user_command)
     app.cli.add_command(seed_admin_command)
     app.cli.add_command(set_password_command) # Add the set-password command
+    app.cli.add_command(send_test_mqtt) # Add the send-test-mqtt command
     app.logger.info("Registered custom CLI commands.") 
