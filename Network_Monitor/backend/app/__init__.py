@@ -62,6 +62,15 @@ def create_app(config_name=None):
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
 
+    # --- Explicitly convert string env vars to boolean in app.config --- #
+    # This ensures correct boolean type after loading from potentially varied sources
+    app.config['AI_ENGINE_ENABLED'] = str(app.config.get('AI_ENGINE_ENABLED', 'false')).lower() == 'true'
+    app.config['AI_ENGINE_MQTT_TLS_ENABLED'] = str(app.config.get('AI_ENGINE_MQTT_TLS_ENABLED', 'false')).lower() == 'true'
+    # Note: LOG_ANALYZER_MQTT_ENABLED was likely already correct because it was defined in config.py
+    # But doing it here too for consistency might be safer:
+    app.config['LOG_ANALYZER_MQTT_ENABLED'] = str(app.config.get('LOG_ANALYZER_MQTT_ENABLED', 'false')).lower() == 'true'
+    # --- End boolean conversion --- #
+
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
@@ -111,11 +120,11 @@ def create_app(config_name=None):
     # Schedule tasks if needed (make sure this runs only once)
     if not app.config.get('TESTING'): # Don't run scheduler in tests easily
         # Check if AI Pusher is enabled
-        # --- Add Debug Print --- #
-        ai_enabled_raw = app.config.get('AI_ENGINE_ENABLED')
-        print(f"DEBUG: Raw value of AI_ENGINE_ENABLED from app.config: {ai_enabled_raw} (Type: {type(ai_enabled_raw)})")
-        # --- End Debug Print --- #
-        ai_enabled = app.config.get('AI_ENGINE_ENABLED', False)
+        # --- Remove Debug Print --- #
+        # ai_enabled_raw = app.config.get('AI_ENGINE_ENABLED') # Value before explicit conversion
+        # print(f"DEBUG: Raw value of AI_ENGINE_ENABLED from app.config: {ai_enabled_raw} (Type: {type(ai_enabled_raw)})")
+        # --- End Remove Debug Print --- #
+        ai_enabled = app.config.get('AI_ENGINE_ENABLED') # Read the *converted* boolean value
 
         if ai_enabled:
             # AI Pusher is enabled (assumes MQTT method based on current ai_pusher.py)
