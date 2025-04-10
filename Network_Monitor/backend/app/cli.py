@@ -286,6 +286,7 @@ def set_password_command(username, password):
 @with_appcontext
 def send_test_mqtt():
     """Sends a single predefined test message via MQTT to Log-Analyzer."""
+    from flask import current_app
     click.echo("Attempting to send test MQTT message...")
 
     # Check if MQTT push is configured and enabled
