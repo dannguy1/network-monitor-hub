@@ -197,7 +197,7 @@ function LogList() {
     const handleTriggerAIPush = async () => {
         setIsPushing(true); // Set loading state for the button
         try {
-            const response = await api.post('/dashboard/trigger-ai-push'); // Use correct endpoint
+            const response = await api.triggerAIPush(); // Use the exported function
             if (response.data.success) {
                 const { processed, failed } = response.data;
                 const successMsg = `AI Push triggered. Attempted: ${processed !== undefined ? processed : 'N/A'}, Failed: ${failed !== undefined ? failed : 'N/A'}`;

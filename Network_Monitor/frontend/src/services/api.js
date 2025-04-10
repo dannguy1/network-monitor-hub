@@ -72,6 +72,7 @@ const applyUciToDevice = (deviceId, commands) => apiClient.post(`/uci/devices/${
 
 // --- Dashboard --- //
 const getDashboardSummary = () => apiClient.get('/dashboard/summary'); // New
+const triggerAIPush = () => apiClient.post('/dashboard/trigger-ai-push'); // New function
 
 const deleteAllLogs = () => apiClient.delete('/logs');
 
@@ -100,6 +101,7 @@ const api = {
     getLogs,
     applyUciToDevice,
     getDashboardSummary, // Export new function
+    triggerAIPush, // Export new function
     deleteAllLogs,
     changePassword
 };
