@@ -129,7 +129,8 @@ def trigger_ai_push():
     current_app.logger.debug(f"Trigger AI Push Check: AI_ENGINE_ENABLED={ai_enabled} (Type: {type(ai_enabled)}), AI_ENGINE_PUSH_METHOD='{ai_method}' (Type: {type(ai_method)})")
     # --- End Debug --- #
 
-    if not ai_enabled or ai_method != 'mqtt':
+    # Make comparison robust to case/whitespace
+    if not ai_enabled or str(ai_method).strip().lower() != 'mqtt':
         msg = "AI Pusher is disabled or not configured for MQTT."
         current_app.logger.warning(msg)
         return jsonify({"success": False, "message": msg}), 400
