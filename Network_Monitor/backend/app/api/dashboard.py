@@ -7,7 +7,7 @@ import traceback # Import traceback for error logging
 # Corrected imports:
 from .. import db, scheduler        # Import scheduler instance
 from ..models import Device, LogEntry, Credential # Models are defined in app/models/ (one level up, then down)
-from ...services import ai_pusher # Import ai_pusher
+from ..services import ai_pusher # Corrected import: Use two dots
 
 # Create Blueprint
 bp = Blueprint('dashboard', __name__)
