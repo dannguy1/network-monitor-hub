@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, current_app
-from flask_login import login_required
+from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 import socket
 import traceback # Import traceback for error logging
