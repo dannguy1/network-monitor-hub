@@ -2,10 +2,11 @@ import logging
 import time
 import argparse
 import queue
+import json
 
 from .core.config import load_config
 from .ingestion.mqtt_client import MQTTClient
-from .parsing.parser import LogParser, transform_to_json
+# from .parsing.parser import LogParser, transform_to_json # Comment out LogParser import
 from .analysis.analyzer_manager import AnalyzerManager, analysis_result_queue
 from .output.command_publisher import CommandPublisher
 from .ui.app import run_web_server # Import UI runner
@@ -17,47 +18,69 @@ from .monitoring.metrics import ( # Import metrics components
 # Queue for parsed logs, ready for AI processing
 parsed_log_queue = queue.Queue(maxsize=1000)
 
-# Global parser instance
-log_parser = None
+# Global parser instance (Commented out)
+# log_parser = None
 
 def handle_incoming_log(topic: str, payload: bytes):
-    """Callback for handling received MQTT messages, parsing them, and queueing."""
-    global log_parser # Access the global parser instance
+    """Callback for handling received MQTT messages, parsing JSON, and queueing."""
+    # global log_parser # Comment out global parser usage
     logger = logging.getLogger(__name__)
     LOGS_RECEIVED.labels(mqtt_topic=topic).inc()
     try:
-        log_line = payload.decode('utf-8')
-        logger.debug(f"Received log on topic {topic}: {log_line[:100]}...")
+        payload_str = payload.decode('utf-8')
+        logger.debug(f"Received raw payload on topic {topic}: {payload_str[:200]}...")
 
-        if not log_parser:
-            logger.warning("Log parser not initialized, skipping parsing.")
-            LOGS_FAILED.labels(reason='parser_not_ready').inc()
+        # --- Parse as JSON --- #
+        try:
+            log_data = json.loads(payload_str)
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to decode JSON payload on topic {topic}: {payload_str[:200]}...")
+            LOGS_FAILED.labels(reason='json_decode_error').inc()
+            return
+        # --------------------- #
+
+        # Basic validation (optional: add more checks)
+        if not isinstance(log_data, dict) or 'raw_log' not in log_data:
+            logger.warning(f"Received JSON is not a dict or missing 'raw_log' field on {topic}: {log_data}")
+            LOGS_FAILED.labels(reason='invalid_json_structure').inc()
             return
 
-        parsed_result = log_parser.parse_log_line(log_line)
+        # Add metadata (topic is useful)
+        log_data['_topic'] = topic
+        # log_data['_parser_rule'] = 'json' # Add a dummy rule name if needed by analyzers
 
-        if parsed_result:
-            rule_name, parsed_data = parsed_result
-            LOGS_PARSED.labels(parser_rule=rule_name).inc()
-            # Add metadata
-            parsed_data['_raw_log'] = log_line
-            parsed_data['_topic'] = topic
-            parsed_data['_parser_rule'] = rule_name
-            # TODO: Add device ID extraction from topic?
+        # --- Queue the parsed JSON data --- #
+        try:
+            parsed_log_queue.put(log_data, block=False) # Non-blocking
+            logger.debug(f"Queued JSON log data from topic {topic}")
+            LOGS_PARSED.labels(parser_rule='json').inc() # Increment parsed counter
+        except queue.Full:
+            logger.warning("Parsed log queue is full. Discarding JSON log data.")
+            LOGS_FAILED.labels(reason='queue_full').inc()
+        # --------------------------------- #
 
-            try:
-                # Put the dictionary onto the queue for further processing
-                parsed_log_queue.put(parsed_data, block=False) # Non-blocking
-                logger.debug(f"Queued parsed log (Rule: {rule_name})")
-            except queue.Full:
-                logger.warning("Parsed log queue is full. Discarding log.")
-                LOGS_FAILED.labels(reason='queue_full').inc()
-        else:
-            # Handle unparseable lines (maybe queue them separately?)
-            logger.debug("Log line did not match any parsing rules.")
-            LOGS_FAILED.labels(reason='no_match').inc()
-            # Example: Queue unparsed lines elsewhere
-            # unparsed_log_queue.put({"_raw_log": log_line, "_topic": topic})
+        # --- Old LogParser Logic (Commented Out) --- #
+        # if not log_parser:
+        #     logger.warning("Log parser not initialized, skipping parsing.")
+        #     LOGS_FAILED.labels(reason='parser_not_ready').inc()
+        #     return
+        # parsed_result = log_parser.parse_log_line(payload_str)
+        # if parsed_result:
+        #     rule_name, parsed_data = parsed_result
+        #     LOGS_PARSED.labels(parser_rule=rule_name).inc()
+        #     parsed_data['_raw_log'] = payload_str
+        #     parsed_data['_topic'] = topic
+        #     parsed_data['_parser_rule'] = rule_name
+        #     try:
+        #         parsed_log_queue.put(parsed_data, block=False)
+        #         logger.debug(f"Queued parsed log (Rule: {rule_name})")
+        #     except queue.Full:
+        #         logger.warning("Parsed log queue is full. Discarding log.")
+        #         LOGS_FAILED.labels(reason='queue_full').inc()
+        # else:
+        #     logger.debug("Log line did not match any parsing rules.")
+        #     LOGS_FAILED.labels(reason='no_match').inc()
+        # --- End Old Logic --- #
 
     except UnicodeDecodeError:
         logger.warning(f"Failed to decode payload on topic {topic} as UTF-8.")
@@ -68,7 +91,7 @@ def handle_incoming_log(topic: str, payload: bytes):
 
 def main():
     """Main entry point for the Log Analyzer service."""
-    global log_parser # Declare modification of global
+    # global log_parser # Comment out global
     parser = argparse.ArgumentParser(description="OpenWRT Log Analyzer Service")
     parser.add_argument("-c", "--config", help="Path to configuration file", default=None)
     args = parser.parse_args()
@@ -103,13 +126,13 @@ def main():
         # Start Metrics Server first (as it runs independently)
         start_metrics_server(9090, config)
 
-        # Initialize Parser first
-        if config.get('parsing') and 'rules' in config['parsing']:
-            logger.info("Initializing Log Parser...")
-            log_parser = LogParser(config['parsing']['rules'])
-        else:
-            logger.warning("Parsing rules not found in config. Parser will not be effective.")
-            log_parser = LogParser([]) # Initialize with empty rules
+        # Initialize Parser first (Commented Out - Not needed for direct JSON)
+        # if config.get('parsing') and 'rules' in config['parsing']:
+        #     logger.info("Initializing Log Parser...")
+        #     log_parser = LogParser(config['parsing']['rules'])
+        # else:
+        #     logger.warning("Parsing rules not found in config. Parser will not be effective.")
+        #     log_parser = LogParser([]) # Initialize with empty rules
 
         # Initialize Analyzer Manager
         logger.info("Initializing Analyzer Manager...")
@@ -138,7 +161,8 @@ def main():
         web_server_thread = run_web_server(
             config, config_file_path, # Pass config path
             parsed_log_queue, analysis_result_queue,
-            log_parser, analyzer_manager, command_publisher, mqtt_client
+            # log_parser, # Comment out log_parser usage
+            analyzer_manager, command_publisher, mqtt_client
         )
 
         # Initialize monitoring
