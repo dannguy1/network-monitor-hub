@@ -4,6 +4,7 @@ import socketserver
 import time
 import os
 import sys
+from datetime import datetime, timezone
 
 # Import services and models needed for commands
 from .services import syslog_processor, ai_pusher
@@ -309,7 +310,15 @@ def send_test_mqtt():
 
     client_id = f"network-monitor-test-sender-{os.getpid()}"
     test_topic = f"{topic_prefix}/test_command"
-    test_payload = json.dumps({"test_message": "Hello from Network-Monitor test command!", "timestamp": time.time()})
+    # --- Update Test Payload Structure --- #
+    test_payload_dict = {
+        "timestamp": datetime.now(timezone.utc).isoformat(), # Use current time
+        "source_ip": "127.0.0.1", # Dummy source IP for test
+        "raw_log": "This is a test message from flask send-test-mqtt"
+    }
+    test_payload = json.dumps(test_payload_dict)
+    # --- End Update --- #
+    # Old payload: json.dumps({"test_message": "Hello from Network-Monitor test command!", "timestamp": time.time()})
 
     click.echo(f"Connecting to {host}:{port}...")
     mqttc = None
