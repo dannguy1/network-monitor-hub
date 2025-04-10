@@ -153,8 +153,16 @@ def push_logs_to_ai(max_batch_size=DEFAULT_BATCH_SIZE):
                          continue
 
                     target_topic = f"{topic_prefix}/{device_identifier}"
-                    # Use raw_message if available, otherwise formatted message
-                    payload = log.raw_message if log.raw_message else f"{log.timestamp.strftime('%b %d %H:%M:%S')} {log.device_ip} {log.process_name or '-'}: {log.message}"
+                    # --- Construct JSON Payload --- #
+                    payload_dict = {
+                        "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+                        "source_ip": log.device_ip,
+                        "raw_log": log.raw_message
+                    }
+                    payload = json.dumps(payload_dict)
+                    # --- End JSON Payload --- #
+                    # Old Payload construction:
+                    # payload = log.raw_message if log.raw_message else f"{log.timestamp.strftime('%b %d %H:%M:%S')} {log.device_ip} {log.process_name or '-'}: {log.message}"
 
                     msg_info = mqtt_client.publish(target_topic, payload=payload.encode('utf-8'), qos=qos)
                     # Optional: Check if publish was queued successfully
