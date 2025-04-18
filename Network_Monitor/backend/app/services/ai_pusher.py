@@ -39,7 +39,7 @@ def _ensure_mqtt_connection():
     """Initializes and ensures the MQTT client is connected."""
     global mqtt_client, mqtt_connected
 
-    if not current_app.config.get('LOG_ANALYZER_MQTT_ENABLED'):
+    if not current_app.config.get('AI_ENGINE_ENABLED'):
         if mqtt_client:
             try:
                 mqtt_client.loop_stop()
@@ -67,13 +67,13 @@ def _ensure_mqtt_connection():
 
     # Initialize new client
     try:
-        host = current_app.config.get('LOG_ANALYZER_MQTT_HOST')
-        port = current_app.config.get('LOG_ANALYZER_MQTT_PORT')
-        client_id = current_app.config.get('LOG_ANALYZER_MQTT_CLIENT_ID')
-        username = current_app.config.get('LOG_ANALYZER_MQTT_USERNAME')
-        password = current_app.config.get('LOG_ANALYZER_MQTT_PASSWORD')
-        use_tls = current_app.config.get('LOG_ANALYZER_MQTT_USE_TLS')
-        ca_certs = current_app.config.get('LOG_ANALYZER_MQTT_TLS_CA_CERTS')
+        host = current_app.config.get('AI_ENGINE_MQTT_HOST')
+        port = current_app.config.get('AI_ENGINE_MQTT_PORT')
+        client_id = current_app.config.get('AI_ENGINE_MQTT_CLIENT_ID', 'network_monitor_ai_pusher')
+        username = current_app.config.get('AI_ENGINE_MQTT_USERNAME')
+        password = current_app.config.get('AI_ENGINE_MQTT_PASSWORD')
+        use_tls = current_app.config.get('AI_ENGINE_MQTT_TLS_ENABLED')
+        ca_certs = current_app.config.get('AI_ENGINE_MQTT_TLS_CA_CERTS')
 
         logger.info(f"Initializing AI Pusher MQTT client for {host}:{port}")
         mqtt_client = paho_mqtt.Client(client_id=client_id)
@@ -103,8 +103,8 @@ def push_logs_to_ai(max_batch_size=DEFAULT_BATCH_SIZE):
     """Queries unprocessed logs and pushes them to Log Analyzer via MQTT."""
     global mqtt_client, mqtt_connected
 
-    if not current_app.config.get('LOG_ANALYZER_MQTT_ENABLED'):
-        logger.info("LOG_ANALYZER_MQTT_ENABLED is false. Skipping AI push.")
+    if not current_app.config.get('AI_ENGINE_ENABLED'):
+        logger.info("AI_ENGINE_ENABLED is false. Skipping AI push.")
         return 0, 0
 
     # Ensure MQTT connection is active before processing
@@ -112,8 +112,8 @@ def push_logs_to_ai(max_batch_size=DEFAULT_BATCH_SIZE):
         logger.warning("Cannot push logs: MQTT client not connected.")
         return 0, 0 # Return 0 processed, 0 failed if no connection
 
-    topic_prefix = current_app.config.get('LOG_ANALYZER_MQTT_TOPIC_PREFIX')
-    qos = current_app.config.get('LOG_ANALYZER_MQTT_QOS')
+    topic_prefix = current_app.config.get('AI_ENGINE_MQTT_TOPIC_PREFIX')
+    qos = current_app.config.get('AI_ENGINE_MQTT_QOS', 1)
 
     processed_count = 0
     failed_count = 0

@@ -36,6 +36,8 @@ class Config:
     AI_ENGINE_MQTT_PASSWORD = os.environ.get('AI_ENGINE_MQTT_PASSWORD')
     AI_ENGINE_MQTT_TLS_ENABLED = os.environ.get('AI_ENGINE_MQTT_TLS_ENABLED', 'false') # Load as string
     AI_ENGINE_MQTT_TLS_CA_CERTS = os.environ.get('AI_ENGINE_MQTT_TLS_CA_CERTS')
+    AI_ENGINE_MQTT_QOS = int(os.environ.get('AI_ENGINE_MQTT_QOS', '1')) # Add QOS setting
+    AI_ENGINE_MQTT_CLIENT_ID = os.environ.get('AI_ENGINE_MQTT_CLIENT_ID', 'network_monitor_ai_pusher') # Add Client ID
 
     # Syslog Server (Built-in) Configuration
     SYSLOG_UDP_PORT = os.environ.get('SYSLOG_UDP_PORT')

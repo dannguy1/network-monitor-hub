@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert, Button, Spinner, Table, Card, Badge, ButtonGroup } from 'react-bootstrap';
+import { Alert, Button, Spinner, Table, Card, Badge, ButtonGroup, Tooltip, OverlayTrigger, Dropdown, Modal, ListGroup } from 'react-bootstrap';
 import api from '../services/api';
 import DeviceForm from './DeviceForm';
 import ApplyUciModal from './ApplyUciModal';
-import { PencilSquare, Trash, Key, CheckCircle, XCircle, ArrowRepeat, GearFill, Power, CloudArrowUpFill, CloudSlashFill, PlusCircleFill } from 'react-bootstrap-icons';
+import { PencilSquare, Trash, Key, CheckCircle, XCircle, ArrowRepeat, GearFill, Power, CloudArrowUpFill, CloudSlashFill, PlusCircleFill, FileEarmarkArrowDown, FileText } from 'react-bootstrap-icons';
 
 function DeviceList() {
     const [devices, setDevices] = useState([]);
@@ -19,6 +19,10 @@ function DeviceList() {
     const [logConfigStatus, setLogConfigStatus] = useState({});
     const [rebootingDevice, setRebootingDevice] = useState(null);
     const [refreshingDevice, setRefreshingDevice] = useState(null);
+    const [exportingDevice, setExportingDevice] = useState(null);
+    const [exportingRawDevice, setExportingRawDevice] = useState(null);
+    const [showActionsModal, setShowActionsModal] = useState(false);
+    const [actionsTargetDevice, setActionsTargetDevice] = useState(null);
 
     // --- Define fetchLogConfig first --- //
     const fetchLogConfig = useCallback(async (deviceId, currentDevices) => {
@@ -351,6 +355,191 @@ function DeviceList() {
         );
     };
 
+    const handleExportLogs = async (device) => {
+        clearActionFeedback();
+        setExportingDevice(device.id);
+        setActionMessage(`Exporting logs for ${device.name}...`);
+
+        try {
+            const response = await api.exportLogs(device.id);
+
+            let filename = `${device.name || device.ip_address}_logs.csv`;
+            const disposition = response.headers['content-disposition'];
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                const matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+
+            const blob = new Blob([response.data], { type: 'text/csv' });
+
+            const url = window.URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setActionMessage(`Successfully exported logs for ${device.name}.`);
+            setTimeout(() => setActionMessage(null), 4000);
+
+        } catch (err) {
+            console.error(`Error exporting logs for device ${device.id}:`, err);
+            const errMsg = err.response?.data?.error || err.message || 'Failed to export logs';
+            setActionError(errMsg);
+        } finally {
+            setExportingDevice(null);
+            if (actionMessage === `Exporting logs for ${device.name}...`) {
+                 setActionMessage(null);
+            }
+        }
+    };
+
+    const handleExportRawLogs = async (device) => {
+        clearActionFeedback();
+        setExportingRawDevice(device.id);
+        setActionMessage(`Exporting raw logs for ${device.name}...`);
+
+        try {
+            const response = await api.exportRawLogs(device.id);
+
+            let filename = `${device.name || device.ip_address}_raw_logs.log`;
+            const disposition = response.headers['content-disposition'];
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                const matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+
+            const blob = new Blob([response.data], { type: 'text/plain' });
+
+            const url = window.URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setActionMessage(`Successfully exported raw logs for ${device.name}.`);
+            setTimeout(() => setActionMessage(null), 4000);
+
+        } catch (err) {
+            console.error(`Error exporting raw logs for device ${device.id}:`, err);
+            const errMsg = err.response?.data?.error || err.message || 'Failed to export raw logs';
+            setActionError(errMsg);
+        } finally {
+            setExportingRawDevice(null);
+            if (actionMessage === `Exporting raw logs for ${device.name}...`) {
+                setActionMessage(null);
+            }
+        }
+    };
+
+    const handleOpenActionsModal = (device) => {
+        clearActionFeedback();
+        setActionsTargetDevice(device);
+        setShowActionsModal(true);
+    };
+
+    const handleCloseActionsModal = () => {
+        setShowActionsModal(false);
+        setActionsTargetDevice(null);
+    };
+
+    const renderDeviceActionsModal = () => {
+        if (!showActionsModal || !actionsTargetDevice) {
+            return null;
+        }
+        
+        const device = actionsTargetDevice;
+        const deviceId = device.id;
+        const credId = device.credential_id;
+        const logStatus = logConfigStatus[deviceId];
+        const verifyStatus = verificationStatus[credId];
+
+        const createActionHandler = (handler) => {
+             return () => {
+                 handler(device);
+                 handleCloseActionsModal();
+             };
+        };
+         const createActionHandlerById = (handler) => {
+             return () => {
+                 handler(deviceId);
+                 handleCloseActionsModal();
+             };
+        };
+         const createToggleHandler = (handler) => {
+             return () => {
+                 handler(deviceId, logStatus?.enabled);
+                 handleCloseActionsModal();
+             };
+        };
+
+        return (
+            <Modal show={showActionsModal} onHide={handleCloseActionsModal} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Actions for: {device.name}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <ListGroup variant="flush">
+                        <ListGroup.Item action onClick={createActionHandler(openEditForm)}>
+                             <PencilSquare className="me-2"/> Edit Device
+                        </ListGroup.Item>
+                        <ListGroup.Item action onClick={createActionHandlerById(handleVerify)} disabled={!credId || verifyStatus?.status === 'loading'}>
+                            {verifyStatus?.status === 'loading' ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : <Key className="me-2"/>} 
+                            Verify Credential
+                        </ListGroup.Item>
+                        <ListGroup.Item action onClick={createActionHandler(handleReboot)} disabled={!credId || rebootingDevice === deviceId}>
+                            {rebootingDevice === deviceId ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : <Power className="me-2"/>} 
+                             Reboot Device
+                        </ListGroup.Item>
+                         <ListGroup.Item action onClick={createActionHandlerById(handleRefreshStatus)} disabled={refreshingDevice === deviceId}>
+                             {refreshingDevice === device.id ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : <ArrowRepeat className="me-2"/>} 
+                             Refresh Status
+                        </ListGroup.Item>
+                        <ListGroup.Item action onClick={createActionHandler(openUciModal)} disabled={!credId}>
+                            <GearFill className="me-2"/> Apply UCI Commands
+                        </ListGroup.Item>
+                        <ListGroup.Item action onClick={createToggleHandler(handleToggleLogConfig)} disabled={!credId || logStatus?.loading}>
+                            {logStatus?.loading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : 
+                             (logStatus?.enabled ? <CloudSlashFill className="me-2"/> : <CloudArrowUpFill className="me-2"/>)}
+                            {logStatus?.enabled ? 'Disable Remote Syslog' : 'Enable Remote Syslog'}
+                        </ListGroup.Item>
+                         <ListGroup.Item action onClick={createActionHandler(handleExportLogs)} disabled={exportingDevice === deviceId}>
+                             {exportingDevice === deviceId ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : <FileEarmarkArrowDown className="me-2"/>}
+                             Export Logs (CSV)
+                        </ListGroup.Item>
+                         <ListGroup.Item action onClick={createActionHandler(handleExportRawLogs)} disabled={exportingRawDevice === deviceId}>
+                             {exportingRawDevice === deviceId ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : <FileText className="me-2"/>}
+                             Export Raw Logs (.log)
+                        </ListGroup.Item>
+                         <ListGroup.Item action onClick={createActionHandler(handleDelete)} variant="danger">
+                             <Trash className="me-2"/> Delete Device
+                        </ListGroup.Item>
+                    </ListGroup>
+                </Modal.Body>
+                 <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseActionsModal}>
+                        Close
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+        );
+    };
+
     if (loading && devices.length === 0) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
@@ -444,30 +633,15 @@ function DeviceList() {
                                          )}
                                      </td>
                                      <td>
-                                         <ButtonGroup size="sm">
-                                             <Button variant="outline-secondary" onClick={() => openEditForm(device)} title="Edit Device">
-                                                 <PencilSquare />
-                                             </Button>
-                                             <Button
-                                                  variant="outline-info"
-                                                  onClick={() => openUciModal(device)}
-                                                  disabled={!device.credential_id || logConfigStatus[device.id]?.loading || refreshingDevice === device.id}
-                                                  title="Apply UCI Config"
-                                              >
-                                                 <GearFill />
-                                             </Button>
-                                             <Button
-                                                 variant="outline-warning"
-                                                 onClick={() => handleReboot(device)}
-                                                  disabled={!device.credential_id || rebootingDevice === device.id || logConfigStatus[device.id]?.loading || refreshingDevice === device.id}
-                                                  title="Reboot Device"
-                                              >
-                                                 {rebootingDevice === device.id ? <Spinner as="span" animation="border" size="sm" /> : <Power />}
-                                             </Button>
-                                             <Button variant="outline-danger" onClick={() => handleDelete(device)} title="Delete Device">
-                                                 <Trash />
-                                             </Button>
-                                         </ButtonGroup>
+                                         <OverlayTrigger placement="top" overlay={<Tooltip>Device Actions</Tooltip>}> 
+                                            <Button 
+                                                variant="outline-secondary" 
+                                                size="sm" 
+                                                onClick={() => handleOpenActionsModal(device)}
+                                            >
+                                                <GearFill />
+                                            </Button>
+                                          </OverlayTrigger>
                                      </td>
                                  </tr>
                              ))
@@ -483,6 +657,8 @@ function DeviceList() {
                         onCancel={handleCancelUciModal}
                     />
                  )}
+
+                 {renderDeviceActionsModal()}
 
              </Card.Body>
          </Card>

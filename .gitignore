@@ -1,0 +1,20 @@
+# Node modules
+Network_Monitor/node_modules/
+
+# Python virtual environment
+venv/
+*.pyc
+__pycache__/
+
+# Instance folder (contains sensitive config potentially)
+Network_Monitor/backend/instance/
+
+# Environment variables file
+.env
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Log Analyzer Config
+Log-Analyzer/config.yaml 

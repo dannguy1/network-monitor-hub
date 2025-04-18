@@ -66,6 +66,16 @@ const verifyDeviceCredential = (deviceId) => apiClient.post(`/devices/${deviceId
 
 // --- Logs --- //
 const getLogs = (params) => apiClient.get('/logs', { params });
+const deleteAllLogs = () => apiClient.delete('/logs');
+
+// --- NEW Log Export --- //
+const exportLogs = (deviceIdentifier) => apiClient.get(`/logs/export/${deviceIdentifier}`, {
+    responseType: 'blob', // Important to handle file download
+});
+const exportRawLogs = (deviceIdentifier) => apiClient.get(`/logs/export-raw/${deviceIdentifier}`, {
+    responseType: 'blob', // Still use blob for file download
+});
+// --- End Log Export --- //
 
 // --- UCI --- //
 const applyUciToDevice = (deviceId, commands) => apiClient.post(`/uci/devices/${deviceId}/apply`, { commands });
@@ -73,8 +83,6 @@ const applyUciToDevice = (deviceId, commands) => apiClient.post(`/uci/devices/${
 // --- Dashboard --- //
 const getDashboardSummary = () => apiClient.get('/dashboard/summary'); // New
 const triggerAIPush = () => apiClient.post('/dashboard/trigger-ai-push'); // New function
-
-const deleteAllLogs = () => apiClient.delete('/logs');
 
 const api = {
     login,
@@ -99,10 +107,12 @@ const api = {
     // deleteCredential, // Removed
     verifyDeviceCredential, // ADDED
     getLogs,
+    deleteAllLogs, // Keep deleteAllLogs export
+    exportLogs, // Export new function
+    exportRawLogs, // Export new raw export function
     applyUciToDevice,
     getDashboardSummary, // Export new function
     triggerAIPush, // Export new function
-    deleteAllLogs,
     changePassword
 };
 
